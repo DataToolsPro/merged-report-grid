@@ -1,0 +1,245 @@
+/* Merged Report Grid Styles */
+
+:host {
+    --grid-border-color: #dddbda;
+    --header-bg: #fafaf9;
+    --totals-bg: #f3f2f2;
+    --warning-bg: #fff8e6;
+    --error-bg: #fef1ee;
+}
+
+/* Card styling */
+lightning-card {
+    --slds-c-card-radius-border: 0.5rem;
+}
+
+/* Error container */
+.error-container {
+    border-radius: 0.25rem;
+}
+
+/* Table container */
+.table-container {
+    border: 1px solid var(--grid-border-color);
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+/* Totals row */
+.totals-row {
+    background-color: var(--totals-bg);
+    font-weight: 600;
+}
+
+.totals-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.totals-cell {
+    padding: 0.5rem 0.75rem;
+    min-height: 2.5rem;
+    vertical-align: middle;
+}
+
+.totals-cell.row-number-cell {
+    width: 3.75rem;
+    min-width: 3.75rem;
+}
+
+.totals-cell.key-cell {
+    width: 200px;
+    text-align: left;
+}
+
+.totals-cell.value-cell {
+    text-align: right;
+}
+
+/* Warning alerts */
+.slds-alert_warning {
+    background-color: var(--warning-bg);
+    border-radius: 0.25rem;
+}
+
+/* Illustrations */
+.slds-illustration {
+    padding: 2rem;
+    text-align: center;
+}
+
+.slds-illustration lightning-icon {
+    display: block;
+    margin: 0 auto 1rem;
+}
+
+/* Loading state */
+.slds-spinner_container {
+    min-height: 200px;
+}
+
+/* Override datatable header for better styling */
+lightning-datatable {
+    --lwc-tableColorBackgroundHeader: var(--header-bg);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .totals-cell:first-child {
+        padding-left: 1rem;
+    }
+}
+
+/* Processing time footer */
+.slds-text-body_small.slds-text-color_weak {
+    opacity: 0.8;
+}
+
+/* Badge styling for warnings */
+.warning-badge {
+    background-color: #fe9339;
+    color: #fff;
+    padding: 0.125rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-left: 0.5rem;
+}
+
+/* Empty state icon */
+.empty-state-icon {
+    color: #b0adab;
+}
+
+/* ==================== REPORT POPOVER STYLES ==================== */
+
+/* Clickable subtitle */
+.subtitle-link {
+    cursor: pointer;
+    transition: color 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.subtitle-link:hover {
+    color: #0176d3;
+    text-decoration: underline;
+}
+
+.subtitle-link .info-icon {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.subtitle-link:hover .info-icon {
+    opacity: 1;
+}
+
+/* Report popover */
+.report-popover {
+    position: absolute;
+    top: 3rem;
+    left: 0;
+    z-index: 9001;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.report-popover .slds-popover__header {
+    background-color: #f3f3f3;
+    border-bottom: 1px solid #dddbda;
+}
+
+.report-popover .slds-popover__body {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.report-popover .report-link {
+    color: #0176d3;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.report-popover .report-link:hover {
+    text-decoration: underline;
+}
+
+.report-popover .slds-badge_inverse {
+    background-color: #706e6b;
+    font-size: 0.65rem;
+}
+
+/* ==================== DEBUG MODE STYLES ==================== */
+
+.debug-panel {
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.debug-panel .slds-box {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 0.5rem;
+}
+
+.debug-panel h3 {
+    color: #fff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.debug-panel pre.debug-json {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.debug-panel .slds-theme_shade {
+    background-color: #161b22 !important;
+}
+
+.debug-panel .slds-theme_shade h3 {
+    color: #58a6ff;
+}
+
+.debug-panel .slds-theme_shade p {
+    color: #c9d1d9;
+}
+
+.debug-panel .slds-theme_shade strong {
+    color: #fff;
+}
+
+.debug-panel .slds-text-color_weak {
+    color: #8b949e !important;
+}
+
+/* Recommendation badges */
+.debug-panel .rec-error {
+    color: #f85149;
+}
+
+.debug-panel .rec-warning {
+    color: #d29922;
+}
+
+.debug-panel .rec-success {
+    color: #3fb950;
+}

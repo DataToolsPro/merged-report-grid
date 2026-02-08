@@ -1,0 +1,300 @@
+<template>
+    <lightning-card>
+        <!-- Header -->
+        <div slot="title" class="slds-grid slds-grid_vertical-align-center">
+            <template lwc:if={isDebugMode}>
+                <span class="slds-text-heading_medium">🔧 Debug Mode: {title}</span>
+            </template>
+            <template lwc:else>
+                <span class="slds-text-heading_medium">{title}</span>
+                <template lwc:if={hasData}>
+                    <span class="slds-text-body_small slds-m-left_small slds-text-color_weak subtitle-link" 
+                          onclick={handleShowReports} 
+                          title="Click to see report details">
+                        {subtitle}
+                        <lightning-icon icon-name="utility:info" size="xx-small" class="slds-m-left_xx-small info-icon"></lightning-icon>
+                    </span>
+                </template>
+            </template>
+            
+            <!-- Report Details Popover -->
+            <template lwc:if={showReportPopover}>
+                <section class="report-popover slds-popover slds-popover_medium slds-nubbin_top-left" role="dialog">
+                    <button class="slds-button slds-button_icon slds-button_icon-small slds-float_right slds-popover__close" 
+                            title="Close" onclick={handleClosePopover}>
+                        <lightning-icon icon-name="utility:close" size="x-small" alternative-text="Close"></lightning-icon>
+                    </button>
+                    <header class="slds-popover__header">
+                        <h2 class="slds-text-heading_small">Source Reports</h2>
+                    </header>
+                    <div class="slds-popover__body">
+                        <ul class="slds-list_dotted">
+                            <template for:each={reportDetailsList} for:item="report">
+                                <li key={report.id} class="slds-m-bottom_x-small">
+                                    <a href={report.url} target="_blank" class="report-link">
+                                        {report.name}
+                                        <lightning-icon icon-name="utility:new_window" size="xx-small" class="slds-m-left_xx-small"></lightning-icon>
+                                    </a>
+                                    <template lwc:if={report.dimensionConstant}>
+                                        <span class="slds-badge slds-badge_inverse slds-m-left_x-small">{report.dimensionConstant}</span>
+                                    </template>
+                                </li>
+                            </template>
+                        </ul>
+                        <template lwc:if={mergeMode}>
+                            <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">
+                                Mode: <strong>{mergeMode}</strong>
+                            </p>
+                        </template>
+                    </div>
+                </section>
+            </template>
+        </div>
+        
+        <!-- Body -->
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            
+            <!-- DEBUG MODE PANEL -->
+            <template lwc:if={isDebugMode}>
+                <div class="debug-panel">
+                    <!-- Recommendations -->
+                    <div class="slds-box slds-m-bottom_medium slds-theme_shade">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">📋 Recommendations</h3>
+                        <template for:each={debugRecommendationsList} for:item="rec">
+                            <div key={rec.issue} class="slds-m-bottom_x-small">
+                                <template lwc:if={rec.type}>
+                                    <span class={rec.type}></span>
+                                </template>
+                                <div class="slds-grid">
+                                    <div class="slds-col slds-size_1-of-12">
+                                        <template lwc:if={rec.type}>
+                                            <lightning-icon 
+                                                icon-name={debugIconName}
+                                                size="x-small"
+                                                class="slds-m-right_x-small">
+                                            </lightning-icon>
+                                        </template>
+                                    </div>
+                                    <div class="slds-col slds-size_11-of-12">
+                                        <p><strong>{rec.issue}</strong></p>
+                                        <p class="slds-text-color_weak">{rec.fix}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Configuration -->
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">⚙️ Configuration (Properties)</h3>
+                        <pre class="debug-json">{debugConfigJson}</pre>
+                    </div>
+                    
+                    <!-- Options JSON being sent -->
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">📤 Options JSON (Sent to Apex)</h3>
+                        <pre class="debug-json">{optionsJsonFormatted}</pre>
+                    </div>
+                    
+                    <!-- Response -->
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">📥 Response from Apex</h3>
+                        <pre class="debug-json">{debugResponseJson}</pre>
+                    </div>
+                    
+                    <!-- Columns/Reports Info -->
+                    <div class="slds-box slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">📊 Columns &amp; Data</h3>
+                        <pre class="debug-json">{debugReportsJson}</pre>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- NORMAL MODE -->
+            <template lwc:else>
+            
+            <!-- Configuration Error -->
+            <template lwc:if={configurationError}>
+                <div class="slds-illustration slds-illustration_small">
+                    <div class="slds-m-vertical_medium">
+                        <lightning-icon
+                            icon-name="utility:settings"
+                            alternative-text="Configuration needed"
+                            size="large"
+                            class="slds-icon-text-default"
+                        ></lightning-icon>
+                    </div>
+                    <div class="slds-text-longform">
+                        <h3 class="slds-text-heading_medium">Configuration Required</h3>
+                        <p class="slds-text-body_regular slds-m-top_small">{configurationError}</p>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Loading State -->
+            <template lwc:elseif={isLoading}>
+                <div class="slds-is-relative slds-p-vertical_xx-large">
+                    <lightning-spinner
+                        alternative-text="Loading"
+                        size="medium"
+                    ></lightning-spinner>
+                    <p class="slds-text-align_center slds-m-top_xx-large slds-p-top_xx-large">
+                        Loading report data...
+                    </p>
+                </div>
+            </template>
+            
+            <!-- Error State -->
+            <template lwc:elseif={showErrorState}>
+                <div class="error-container slds-p-around_medium slds-theme_error slds-theme_alert-texture">
+                    <div class="slds-grid slds-grid_vertical-align-center">
+                        <lightning-icon
+                            icon-name="utility:error"
+                            alternative-text="Error"
+                            variant="inverse"
+                            size="small"
+                            class="slds-m-right_small"
+                        ></lightning-icon>
+                        <span class="slds-text-color_inverse">{errorMessage}</span>
+                    </div>
+                </div>
+                
+                <!-- Show non-fatal errors if any -->
+                <template lwc:if={hasNonFatalErrors}>
+                    <div class="slds-m-top_medium">
+                        <template for:each={nonFatalErrors} for:item="err">
+                            <div key={err.reportId} class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_x-small" role="alert">
+                                <span class="slds-text-body_small">
+                                    <template lwc:if={err.reportName}>
+                                        <strong>{err.reportName}:</strong>
+                                    </template>
+                                    {err.message}
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </template>
+            
+            <!-- Data Grid -->
+            <template lwc:elseif={hasData}>
+                <!-- Warnings Banner -->
+                <template lwc:if={showOverlapWarning}>
+                    <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_small" role="alert">
+                        <lightning-icon
+                            icon-name="utility:warning"
+                            alternative-text="Warning"
+                            variant="warning"
+                            size="x-small"
+                            class="slds-m-right_x-small"
+                        ></lightning-icon>
+                        <span class="slds-text-body_small">{overlapWarningMessage}</span>
+                    </div>
+                </template>
+                
+                <template lwc:if={showDuplicateWarning}>
+                    <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_small" role="alert">
+                        <lightning-icon
+                            icon-name="utility:warning"
+                            alternative-text="Warning"
+                            variant="warning"
+                            size="x-small"
+                            class="slds-m-right_x-small"
+                        ></lightning-icon>
+                        <span class="slds-text-body_small">Some rows were combined due to duplicate keys.</span>
+                    </div>
+                </template>
+                
+                <!-- Non-fatal errors banner -->
+                <template lwc:if={hasNonFatalErrors}>
+                    <template for:each={nonFatalErrors} for:item="err">
+                        <div key={err.reportId} class="slds-notify slds-notify_alert slds-alert_warning slds-m-bottom_small" role="alert">
+                            <span class="slds-text-body_small">
+                                <template lwc:if={err.reportName}>
+                                    <strong>{err.reportName}:</strong>
+                                </template>
+                                {err.message}
+                            </span>
+                        </div>
+                    </template>
+                </template>
+                
+                <!-- Data Table -->
+                <div class="table-container">
+                    <lightning-datatable
+                        key-field="id"
+                        data={tableData}
+                        columns={tableColumns}
+                        sorted-by={currentSortBy}
+                        sorted-direction={currentSortDirection}
+                        onsort={handleSort}
+                        hide-checkbox-column
+                        show-row-number-column
+                    ></lightning-datatable>
+                    
+                    <!-- Totals Row -->
+                    <template lwc:if={showTotalsRow}>
+                        <div class="totals-row slds-border_top slds-p-vertical_x-small">
+                            <table class="slds-table totals-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="totals-cell row-number-cell"></td>
+                                        <td class="totals-cell key-cell">
+                                            <strong>Total</strong>
+                                        </td>
+                                        <template for:each={valueColumns} for:item="col">
+                                            <td key={col.key} class="totals-cell value-cell">
+                                                <strong>{col.totalValue}</strong>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Truncation Warning -->
+                <template lwc:if={showTruncationWarning}>
+                    <div class="slds-notify slds-notify_alert slds-alert_warning slds-m-top_small" role="alert">
+                        <lightning-icon
+                            icon-name="utility:info"
+                            alternative-text="Info"
+                            size="x-small"
+                            class="slds-m-right_x-small"
+                        ></lightning-icon>
+                        <span class="slds-text-body_small">{truncationMessage}</span>
+                    </div>
+                </template>
+                
+                <!-- Processing Time Footer -->
+                <template lwc:if={showProcessingTime}>
+                    <div class="slds-text-body_small slds-text-color_weak slds-text-align_right slds-m-top_small">
+                        Loaded in {processingTime}ms
+                    </div>
+                </template>
+            </template>
+            
+            <!-- No Data State -->
+            <template lwc:else>
+                <div class="slds-illustration slds-illustration_small slds-p-vertical_large">
+                    <div class="slds-text-longform slds-text-align_center">
+                        <lightning-icon
+                            icon-name="utility:table"
+                            alternative-text="No data"
+                            size="large"
+                            class="slds-icon-text-default slds-m-bottom_medium"
+                        ></lightning-icon>
+                        <h3 class="slds-text-heading_medium">No Data Available</h3>
+                        <p class="slds-text-body_regular slds-m-top_small">
+                            The configured reports returned no mergeable data.
+                        </p>
+                    </div>
+                </div>
+            </template>
+            
+            </template><!-- End NORMAL MODE -->
+            
+        </div>
+    </lightning-card>
+</template>

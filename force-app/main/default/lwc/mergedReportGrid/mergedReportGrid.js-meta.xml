@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Merged Report Grid</masterLabel>
+    <description>Merges 2-5 Salesforce reports. JOIN mode combines horizontally, UNION mode stacks vertically with support for 2 dimensions.</description>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AppPage,lightning__HomePage,lightning__RecordPage">
+            <!-- Required Report IDs -->
+            <property name="report1Id" type="String" label="Report 1 ID" 
+                      description="18-character Report ID (required)" required="true"/>
+            <property name="report2Id" type="String" label="Report 2 ID" 
+                      description="18-character Report ID (required)" required="true"/>
+            <property name="report3Id" type="String" label="Report 3 ID" 
+                      description="The ID of the third report (optional)"/>
+            <property name="report4Id" type="String" label="Report 4 ID" 
+                      description="The ID of the fourth report (optional)"/>
+            <property name="report5Id" type="String" label="Report 5 ID" 
+                      description="The ID of the fifth report (optional)"/>
+            
+            <!-- Merge Mode -->
+            <property name="mergeMode" type="String" label="Merge Mode" default="OUTER_JOIN"
+                      datasource="OUTER_JOIN,INNER_JOIN,UNION"
+                      description="OUTER_JOIN: horizontal, all keys. INNER_JOIN: horizontal, matching keys only. UNION: vertical stack."/>
+            
+            <!-- Data Visibility -->
+            <property name="visibilityScope" type="String" label="Data Visibility" default="ALL"
+                      datasource="ALL,MY_RECORDS,MY_TEAM"
+                      description="ALL: use report defaults. MY_RECORDS: only current user's data. MY_TEAM: user + subordinates."/>
+            
+            <!-- UNION Mode Options -->
+            <property name="dimensionConstantsJson" type="String" label="Dimension Constants (JSON)"
+                      description="For UNION when reports have different dimension counts. Format: {&quot;1&quot;: &quot;Total&quot;, &quot;2&quot;: &quot;Combined&quot;}"/>
+            <property name="showSubtotals" type="Boolean" label="Show Subtotals" default="false"
+                      description="Add subtotal row after each primary group (UNION with 2 dims)"/>
+            <property name="subtotalLabel" type="String" label="Subtotal Label" default="SUBTOTAL"
+                      description="Label for subtotal rows"/>
+            <property name="fillMissingCategories" type="Boolean" label="Fill Missing Categories" default="false"
+                      description="Fill all category combinations with zeros (UNION mode)"/>
+            <property name="sortGroupsBy" type="String" label="Sort Groups By Column"
+                      description="Column key to sort groups by aggregate (e.g., merged_Record_Count). Keeps groups together."/>
+            
+            <!-- Column Configuration -->
+            <property name="columnAliasesJson" type="String" label="Column Aliases (JSON)"
+                      description="Rename columns. Format: {&quot;Record Count&quot;:&quot;Total&quot;, &quot;Sum of Amount (2)&quot;:&quot;Revenue&quot;}"/>
+            <property name="calculatedFieldsJson" type="String" label="Calculated Fields (JSON)"
+                      description="Add computed columns (JOIN mode only). Format: [{&quot;label&quot;:&quot;Diff&quot;,&quot;formula&quot;:&quot;r1_RowCount - r2_RowCount&quot;}]"/>
+            
+            <!-- Display Options -->
+            <property name="missingValueAsZero" type="Boolean" label="Show Missing as Zero" default="false"
+                      description="Display missing values as 0 instead of —"/>
+            <property name="sortBy" type="String" label="Sort By" default="KEY"
+                      datasource="KEY,REPORT1_VALUE,REPORT2_VALUE,REPORT3_VALUE,REPORT4_VALUE,REPORT5_VALUE"
+                      description="Initial sort column"/>
+            <property name="sortDirection" type="String" label="Sort Direction" default="ASC"
+                      datasource="ASC,DESC"/>
+            <property name="maxRows" type="Integer" label="Maximum Rows" default="200" min="1" max="2000"/>
+            <property name="showGrandTotalRow" type="Boolean" label="Show Grand Total" default="true"/>
+            <property name="componentTitle" type="String" label="Component Title"/>
+            
+            <!-- Debug Mode -->
+            <property name="debugMode" type="Boolean" label="🔧 Debug Mode" default="false"
+                      description="Shows raw data, configuration, and recommendations instead of grid"/>
+            
+            <!-- Cache Buster for App Builder -->
+            <property name="refreshKey" type="String" label="🔄 Refresh Key"
+                      description="Change this value to force refresh in App Builder edit mode"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

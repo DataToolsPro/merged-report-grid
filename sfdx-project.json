@@ -1,0 +1,22 @@
+{
+  "packageDirectories": [
+    {
+      "versionName": "Version 1.3",
+      "versionNumber": "1.3.0.NEXT",
+      "path": "force-app",
+      "default": true,
+      "package": "MergedReportGrid",
+      "versionDescription": "Smart caching, clickable report details, improved App Builder support"
+    }
+  ],
+  "name": "merged-report-grid",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "59.0",
+  "packageAliases": {
+    "MergedReportGrid": "0HoPU000000040P0AQ",
+    "MergedReportGrid@1.0.0-1": "04tPU0000029u53YAA",
+    "MergedReportGrid@1.1.0-1": "04tPU0000029u9tYAA",
+    "MergedReportGrid@1.2.0-1": "04tPU000002A02PYAS"
+  }
+}

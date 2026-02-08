@@ -1,0 +1,99 @@
+# ==================================
+# Salesforce DX / SF CLI
+# ==================================
+# Local CLI configuration and authentication
+.sfdx/
+.sf/
+.localdevserver/
+
+# Scratch org definition overrides (may contain org-specific settings)
+config/project-scratch-def.json
+
+# Local deploy/retrieve tracking
+.sfpowerkit/
+.sonar/
+
+# ==================================
+# Authentication & Secrets
+# ==================================
+# NEVER commit auth files
+**/authFile.json
+**/*-auth.json
+**/sfdx-*.json
+!sfdx-project.json
+
+# Environment files
+.env
+.env.*
+*.env
+env.js
+
+# Secret/key files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# ==================================
+# IDE & Editors
+# ==================================
+.idea/
+.vscode/
+*.sublime-*
+*.swp
+*.swo
+*~
+
+# ==================================
+# OS Generated
+# ==================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==================================
+# Dependencies
+# ==================================
+node_modules/
+package-lock.json
+yarn.lock
+
+# ==================================
+# Build Outputs & Temp
+# ==================================
+dist/
+build/
+coverage/
+.nyc_output/
+*.tmp
+*.bak
+*.orig
+
+# ==================================
+# Logs & Debug
+# ==================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+sf-debug.log
+
+# ==================================
+# Destructive Changes
+# ==================================
+# Deployment artifacts specific to your org
+destructive/
+
+# ==================================
+# Test Data
+# ==================================
+# Don't commit test data files that may contain real data
+**/testdata/
+**/*-testdata.json
