@@ -3,7 +3,7 @@
 A Salesforce Lightning Web Component that merges 2-5 reports into a single unified grid.
 
 ![Salesforce](https://img.shields.io/badge/Salesforce-00A1E0?style=flat&logo=salesforce&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 ![Version](https://img.shields.io/badge/version-1.3.0-blue)
 
 ## Overview
@@ -224,7 +224,9 @@ See [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for full deployment workflow.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file.
+**Proprietary** - Copyright © 2024-2026 DataTools Pro. All Rights Reserved.
+
+See [LICENSE](LICENSE) file for details. For licensing inquiries, contact ryan@datatoolspro.com.
 
 ---
 
