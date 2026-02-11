@@ -615,7 +615,7 @@ public with sharing class MergedReportController {
                                 Decimal value = aggValues.get(aggInfo.key);
                                 if (value != null) {
                                     row.values.put(col.key, value);
-                                    row.formattedValues.put(col.key, formatValue(value, col.dataType));
+                                    row.formattedValues.put(col.key, formatValue(value, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                                 }
                                 break;
                             }
@@ -625,7 +625,7 @@ public with sharing class MergedReportController {
                         Decimal value = aggValues.get(col.aggregateKey);
                         if (value != null) {
                             row.values.put(col.key, value);
-                            row.formattedValues.put(col.key, formatValue(value, col.dataType));
+                            row.formattedValues.put(col.key, formatValue(value, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                         }
                     }
                 }
@@ -704,7 +704,7 @@ public with sharing class MergedReportController {
                         if (val != null) sum += val;
                     }
                     subtotalRow.values.put(col.key, sum);
-                    subtotalRow.formattedValues.put(col.key, formatValue(sum, col.dataType));
+                    subtotalRow.formattedValues.put(col.key, formatValue(sum, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                     
                     // Accumulate grand total
                     if (!grandTotals.containsKey(col.key)) {
@@ -756,15 +756,21 @@ public with sharing class MergedReportController {
                 Decimal total = grandTotals.get(colKey);
                 totalsRow.values.put(colKey, total);
                 
-                // Find data type
+                // Find column definition for data type and custom format
                 String dataType = 'DOUBLE_DATA';
+                String customFormat = null;
+                Integer customDecimals = null;
+                String customCurrencyCode = null;
                 for (MergedGridDTO.ColumnDefinition col : result.columns) {
                     if (col.key == colKey) {
                         dataType = col.dataType;
+                        customFormat = col.customFormat;
+                        customDecimals = col.customDecimals;
+                        customCurrencyCode = col.customCurrencyCode;
                         break;
                     }
                 }
-                totalsRow.formattedValues.put(colKey, formatValue(total, dataType));
+                totalsRow.formattedValues.put(colKey, formatValue(total, dataType, customFormat, customDecimals, customCurrencyCode));
             }
             
             result.totalsRow = totalsRow;
@@ -861,8 +867,12 @@ public with sharing class MergedReportController {
                 col.dataType = aggInfo.dataType;
                 col.reportName = parsed.reportName;
                 
-                // Apply alias
+                // Store original label and apply alias + custom format
+                col.originalLabel = label;
                 col.label = options.getColumnAlias(label);
+                col.customFormat = options.getColumnFormat(label);
+                col.customDecimals = options.getColumnDecimals(label);
+                col.customCurrencyCode = options.getColumnCurrencyCode(label);
                 
                 columns.add(col);
             }
@@ -1086,6 +1096,15 @@ public with sharing class MergedReportController {
                 for (MergedGridDTO.AggregateInfo aggInfo : parsed.aggregates) {
                     String colKey = 'r' + (rptIdx + 1) + '_' + sanitizeKey(aggInfo.key);
                     
+                    // Find column definition for custom format
+                    MergedGridDTO.ColumnDefinition matchingCol = null;
+                    for (MergedGridDTO.ColumnDefinition col : result.columns) {
+                        if (col.key == colKey) {
+                            matchingCol = col;
+                            break;
+                        }
+                    }
+                    
                     Decimal value = null;
                     if (parsed.valuesByKeyByAggregate.containsKey(compositeKey)) {
                         Map<String, Decimal> aggValues = parsed.valuesByKeyByAggregate.get(compositeKey);
@@ -1096,7 +1115,11 @@ public with sharing class MergedReportController {
                     
                     if (value != null) {
                         row.values.put(colKey, value);
-                        row.formattedValues.put(colKey, formatValue(value, aggInfo.dataType));
+                        if (matchingCol != null) {
+                            row.formattedValues.put(colKey, formatValue(value, aggInfo.dataType, matchingCol.customFormat, matchingCol.customDecimals, matchingCol.customCurrencyCode));
+                        } else {
+                            row.formattedValues.put(colKey, formatValue(value, aggInfo.dataType));
+                        }
                         
                         Decimal currentTotal = columnTotals.get(colKey);
                         if (currentTotal != null) {
@@ -1145,7 +1168,7 @@ public with sharing class MergedReportController {
                 if (!col.isKeyColumn && !col.isSecondKeyColumn) {
                     Decimal total = columnTotals.get(col.key);
                     totalsRow.values.put(col.key, total);
-                    totalsRow.formattedValues.put(col.key, formatValue(total, col.dataType));
+                    totalsRow.formattedValues.put(col.key, formatValue(total, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                 }
             }
             
@@ -1244,6 +1267,22 @@ public with sharing class MergedReportController {
                 }
                 
                 col.label = displayLabel;
+                
+                // Store original label and apply custom format (try fullLabel first, then originalLabel)
+                col.originalLabel = fullLabel;
+                col.customFormat = options.getColumnFormat(fullLabel);
+                if (col.customFormat == null) {
+                    col.customFormat = options.getColumnFormat(originalLabel);
+                }
+                col.customDecimals = options.getColumnDecimals(fullLabel);
+                if (col.customDecimals == 2 && options.getColumnConfig(originalLabel) != null) {
+                    col.customDecimals = options.getColumnDecimals(originalLabel);
+                }
+                col.customCurrencyCode = options.getColumnCurrencyCode(fullLabel);
+                if (col.customCurrencyCode == null) {
+                    col.customCurrencyCode = options.getColumnCurrencyCode(originalLabel);
+                }
+                
                 columns.add(col);
             }
         }
@@ -1296,7 +1335,7 @@ public with sharing class MergedReportController {
                 
                 Decimal calcValue = evaluateFormula(resolvedFormula, row.values);
                 row.values.put(col.key, calcValue);
-                row.formattedValues.put(col.key, formatValue(calcValue, col.dataType));
+                row.formattedValues.put(col.key, formatValue(calcValue, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                 if (calcValue != null) {
                     totalCalcValue += calcValue;
                     validCount++;
@@ -1308,7 +1347,7 @@ public with sharing class MergedReportController {
                 if (row.isSubtotalRow) {
                     Decimal calcValue = evaluateFormula(resolvedFormula, row.values);
                     row.values.put(col.key, calcValue);
-                    row.formattedValues.put(col.key, formatValue(calcValue, col.dataType));
+                    row.formattedValues.put(col.key, formatValue(calcValue, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
                 }
             }
             
@@ -1316,7 +1355,7 @@ public with sharing class MergedReportController {
                 // For totals, evaluate formula on totals row values (not sum of calculated values)
                 Decimal totalsCalcValue = evaluateFormula(resolvedFormula, result.totalsRow.values);
                 result.totalsRow.values.put(col.key, totalsCalcValue);
-                result.totalsRow.formattedValues.put(col.key, formatValue(totalsCalcValue, col.dataType));
+                result.totalsRow.formattedValues.put(col.key, formatValue(totalsCalcValue, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
             }
         }
     }
@@ -1495,33 +1534,81 @@ public with sharing class MergedReportController {
     }
     
     private static String formatValue(Decimal value, String dataType) {
+        return formatValue(value, dataType, null, null, null);
+    }
+    
+    /**
+     * @description Formats a value with optional custom format override
+     * @param value The decimal value to format
+     * @param dataType The Salesforce data type (CURRENCY_DATA, PERCENT_DATA, INT_DATA, etc.)
+     * @param customFormat Custom format override (currency, percent, number, none)
+     * @param customDecimals Custom decimal places
+     * @param customCurrencyCode Custom currency code (e.g., EUR, GBP)
+     */
+    private static String formatValue(Decimal value, String dataType, String customFormat, Integer customDecimals, String customCurrencyCode) {
         if (value == null) return '—';
         
-        // Currency formatting with $ symbol and thousand separators
-        if (dataType == 'CURRENCY_DATA') {
+        // Use custom decimals or default to 2
+        Integer decimals = (customDecimals != null) ? customDecimals : 2;
+        
+        // Determine effective format (custom overrides data type)
+        String effectiveFormat = customFormat;
+        if (String.isBlank(effectiveFormat)) {
+            // Map data type to format
+            if (dataType == 'CURRENCY_DATA') effectiveFormat = 'currency';
+            else if (dataType == 'PERCENT_DATA') effectiveFormat = 'percent';
+            else if (dataType == 'INT_DATA') effectiveFormat = 'number';
+            else effectiveFormat = 'number';
+        }
+        
+        // Handle "none" format - raw number without formatting
+        if (effectiveFormat == 'none') {
+            return String.valueOf(value.setScale(decimals, RoundingMode.HALF_UP));
+        }
+        
+        // Currency formatting with symbol and thousand separators
+        if (effectiveFormat == 'currency') {
             Boolean isNegative = value < 0;
-            Decimal absValue = value.abs().setScale(2, RoundingMode.HALF_UP);
-            String formatted = formatWithCommas(absValue, 2);
-            // Get currency symbol from org (defaults to $)
-            String currencySymbol = UserInfo.getDefaultCurrency() == 'USD' ? '$' : UserInfo.getDefaultCurrency() + ' ';
+            Decimal absValue = value.abs().setScale(decimals, RoundingMode.HALF_UP);
+            String formatted = formatWithCommas(absValue, decimals);
+            
+            // Determine currency symbol
+            String currencySymbol;
+            String currCode = String.isNotBlank(customCurrencyCode) ? customCurrencyCode : UserInfo.getDefaultCurrency();
+            if (currCode == 'USD') currencySymbol = '$';
+            else if (currCode == 'EUR') currencySymbol = '€';
+            else if (currCode == 'GBP') currencySymbol = '£';
+            else if (currCode == 'JPY') currencySymbol = '¥';
+            else if (currCode == 'CAD') currencySymbol = 'CA$';
+            else if (currCode == 'AUD') currencySymbol = 'A$';
+            else currencySymbol = currCode + ' ';
+            
             return isNegative ? '-' + currencySymbol + formatted : currencySymbol + formatted;
         }
         
         // Percentage formatting with % symbol
-        if (dataType == 'PERCENT_DATA') {
-            return formatWithCommas(value.setScale(2, RoundingMode.HALF_UP), 2) + '%';
+        if (effectiveFormat == 'percent') {
+            return formatWithCommas(value.setScale(decimals, RoundingMode.HALF_UP), decimals) + '%';
         }
         
-        // Integer formatting with thousand separators
-        if (dataType == 'INT_DATA') {
-            return formatWithCommas(value.setScale(0, RoundingMode.HALF_UP), 0);
+        // Number formatting with thousand separators
+        if (effectiveFormat == 'number') {
+            // For INT_DATA without custom decimals, use 0 decimal places
+            if (dataType == 'INT_DATA' && customDecimals == null) {
+                return formatWithCommas(value.setScale(0, RoundingMode.HALF_UP), 0);
+            }
+            // Check if it's a whole number
+            if (customDecimals == null && value == value.setScale(0)) {
+                return formatWithCommas(value.setScale(0), 0);
+            }
+            return formatWithCommas(value.setScale(decimals, RoundingMode.HALF_UP), decimals);
         }
         
         // Default: format with appropriate decimal places
         if (value == value.setScale(0)) {
             return formatWithCommas(value.setScale(0), 0);
         }
-        return formatWithCommas(value.setScale(2, RoundingMode.HALF_UP), 2);
+        return formatWithCommas(value.setScale(decimals, RoundingMode.HALF_UP), decimals);
     }
     
     /**

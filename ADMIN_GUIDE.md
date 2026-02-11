@@ -2,18 +2,16 @@
 
 A Lightning Web Component that merges 2-5 Salesforce reports into a single unified grid.
 
-**Version:** 1.3.0  
-**Package ID:** 04tPU000002A02PYAS
+**Version:** 1.4.0
 
 ---
 
 ## Table of Contents
 
 1. [Installation & Deployment](#installation--deployment)
-   - [Quick Install (URL)](#option-1-quick-install-url)
-   - [Salesforce CLI Package Install](#option-2-salesforce-cli-package-install)
-   - [Deploy from Source](#option-3-deploy-from-source)
-   - [Full Package Workflow (Enterprise)](#full-package-workflow-for-enterprise)
+   - [For Individual Admins (Source Code Access)](#for-individual-admins-source-code-access)
+   - [For Developers with Package Builder Org (PBO)](#for-developers-with-package-builder-org-pbo)
+2. [Adding to Lightning Pages](#adding-to-lightning-pages)
 2. [Adding to Lightning Pages](#adding-to-lightning-pages)
 3. [Configuration Properties](#configuration-properties)
 4. [Merge Modes](#merge-modes)
@@ -31,68 +29,85 @@ A Lightning Web Component that merges 2-5 Salesforce reports into a single unifi
 
 ## Installation & Deployment
 
+This guide provides deployment instructions for two different scenarios:
+
+- **Individual Salesforce Admins** - You have access to the source code repository and want to deploy directly to your org
+- **Developers with Package Builder Org (PBO)** - You have a DevHub/PBO and want to create and distribute packages
+
+---
+
+## For Individual Admins (Source Code Access)
+
+If you have access to this GitHub repository, you can deploy the component directly to your Salesforce org using one of these methods:
+
 ### Prerequisites
 
-For CLI-based installation, you'll need:
-
 1. **Salesforce CLI** - Download from [developer.salesforce.com/tools/sfdxcli](https://developer.salesforce.com/tools/sfdxcli)
-2. Verify installation:
+2. **Git** (optional, if cloning the repository)
+3. Verify CLI installation:
 ```bash
 sf --version
 ```
 
----
+### Method 1: Deploy via Salesforce CLI (Recommended)
 
-### Option 1: Quick Install (URL)
+This is the fastest method for deploying to a sandbox or production org.
 
-The fastest way to install. Simply click the appropriate link:
+#### Windows (CMD/PowerShell)
 
-**Sandbox Installation:**
+```cmd
+REM 1. Clone the repository (or download and extract the ZIP)
+git clone https://github.com/DataToolsPro/merged-report-grid.git
+cd merged-report-grid
+
+REM 2. Authenticate to your org
+REM For Sandbox:
+sf org login web -a MySandbox --instance-url https://test.salesforce.com
+
+REM For Production:
+sf org login web -a MyProd --instance-url https://login.salesforce.com
+
+REM 3. Deploy the code
+sf project deploy start -o MySandbox
+
+REM 4. (Optional) Run tests to verify
+sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 ```
-https://test.salesforce.com/packaging/installPackage.apexp?p0=04tPU000002A02PYAS
-```
 
-**Production Installation:**
-```
-https://login.salesforce.com/packaging/installPackage.apexp?p0=04tPU000002A02PYAS
-```
+#### Windows (PowerShell)
 
-> ⚠️ **Note:** Production installs require a promoted (released) package version. If the URL doesn't work for production, the package may need to be promoted first.
+```powershell
+# 1. Clone the repository (or download and extract the ZIP)
+git clone https://github.com/DataToolsPro/merged-report-grid.git
+cd merged-report-grid
 
----
-
-### Option 2: Salesforce CLI Package Install
-
-Install the pre-built package via command line:
-
-```bash
-# 1. Authenticate to your org
+# 2. Authenticate to your org
 # For Sandbox:
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
 
 # For Production:
 sf org login web -a MyProd --instance-url https://login.salesforce.com
 
-# 2. Install the package
-sf package install -p 04tPU000002A02PYAS -o MySandbox -w 10
+# 3. Deploy the code
+sf project deploy start -o MySandbox
 
-# 3. Verify installation
-sf package installed list --target-org MySandbox
+# 4. (Optional) Run tests to verify
+sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 ```
 
----
-
-### Option 3: Deploy from Source
-
-Use this when you have access to the source code repository and want to deploy directly without package management.
+#### Mac/Linux (Bash)
 
 ```bash
-# 1. Clone the repository (or download source)
+# 1. Clone the repository (or download and extract the ZIP)
 git clone https://github.com/DataToolsPro/merged-report-grid.git
 cd merged-report-grid
 
 # 2. Authenticate to your org
+# For Sandbox:
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
+
+# For Production:
+sf org login web -a MyProd --instance-url https://login.salesforce.com
 
 # 3. Deploy the code
 sf project deploy start -o MySandbox
@@ -110,13 +125,76 @@ sf project deploy start -o MyProd --test-level RunSpecifiedTests --tests MergedR
 sf project deploy report -o MyProd
 ```
 
+### Method 2: Deploy via Change Sets (Sandbox to Production)
+
+**Yes, this can be deployed to a sandbox and moved via change sets!** This is the traditional Salesforce deployment method that many admins prefer.
+
+#### Step 1: Deploy to Sandbox First
+
+Use Method 1 above to deploy to your sandbox, or use VS Code with Salesforce Extensions.
+
+#### Step 2: Create an Outbound Change Set
+
+1. In your **Sandbox**, navigate to **Setup → Outbound Change Sets**
+2. Click **New** to create a new change set
+3. Give it a name (e.g., "Merged Report Grid v1.4.0")
+4. Add the following components:
+
+   **Apex Classes:**
+   - `MergedReportController`
+   - `MergedReportControllerTest`
+   - `MergeOptions`
+   - `MergedGridDTO`
+
+   **Lightning Components:**
+   - `mergedReportGrid`
+
+5. Click **Upload** to upload the change set
+6. Select your **Production** org as the target
+7. Click **Upload**
+
+#### Step 3: Deploy Change Set to Production
+
+1. In your **Production** org, navigate to **Setup → Inbound Change Sets**
+2. Find the change set you just uploaded
+3. Click **Deploy**
+4. Review the components and click **Deploy**
+5. Monitor the deployment status
+
+> ⚠️ **Important:** Change sets require all Apex tests to pass. The `MergedReportControllerTest` class will run automatically during deployment.
+
+### What's Included in This Package
+
+This repository contains:
+
+- **4 Apex Classes:**
+  - `MergedReportController` - Main controller that fetches and merges reports
+  - `MergedReportControllerTest` - Unit tests (90%+ code coverage)
+  - `MergeOptions` - Configuration data transfer object
+  - `MergedGridDTO` - Response data transfer object
+
+- **1 Lightning Web Component:**
+  - `mergedReportGrid` - The UI component that displays the merged grid
+
+- **Metadata Files:**
+  - All required `.cls-meta.xml` and `.js-meta.xml` files for deployment
+
+### Deployment Checklist
+
+- [ ] Deploy to sandbox first
+- [ ] Run Apex tests: `sf apex run test -n MergedReportControllerTest -o MySandbox`
+- [ ] Test the component in App Builder with sample reports
+- [ ] Verify all functionality works as expected
+- [ ] Deploy to production (via CLI or change set)
+- [ ] Add component to Lightning pages
+
 ---
 
-### Full Package Workflow (For Enterprise)
+## For Developers with Package Builder Org (PBO)
 
-Use unlocked packages for version control, easier upgrades, and multi-org deployments. This is the recommended approach for managing deployments across multiple orgs.
+If you have a DevHub (Package Builder Org) and want to create an unlocked package for distribution across multiple orgs, follow this workflow.
 
-#### Prerequisites for Packaging
+### Prerequisites for Packaging
 
 1. **DevHub Enabled** in your production org:
    - Setup → Dev Hub → Enable
@@ -127,7 +205,7 @@ sf org login web -a DevHub --instance-url https://login.salesforce.com
 sf config set target-dev-hub=DevHub
 ```
 
-#### Step 1: Create a Package (One-Time)
+### Step 1: Create a Package (One-Time)
 
 Skip if the package already exists in your DevHub.
 
@@ -142,7 +220,7 @@ sf package create \
 
 This creates a package ID (starts with `0Ho`) stored in `sfdx-project.json`.
 
-#### Step 2: Create a Package Version
+### Step 2: Create a Package Version
 
 Run this whenever you need to deploy updates:
 
@@ -160,7 +238,7 @@ sf package version create \
 
 The `--code-coverage` flag ensures tests pass and coverage is calculated.
 
-#### Step 3: Install in Sandbox for Testing
+### Step 3: Install in Sandbox for Testing
 
 ```bash
 # List package versions to get the ID:
@@ -176,7 +254,7 @@ sf package install \
 sf package installed list --target-org MySandbox
 ```
 
-#### Step 4: Test in Sandbox
+### Step 4: Test in Sandbox
 
 1. Open the sandbox
 2. Navigate to a Lightning page in App Builder
@@ -184,7 +262,7 @@ sf package installed list --target-org MySandbox
 4. Configure with test reports
 5. Verify functionality
 
-#### Step 5: Promote for Production
+### Step 5: Promote for Production
 
 Once testing is complete, promote the package version to "Released" status:
 
@@ -200,7 +278,7 @@ sf package version list --packages MergedReportGrid --released --target-dev-hub 
 
 > ⚠️ **Important:** Only promoted (released) versions can be installed in production orgs.
 
-#### Step 6: Install in Production
+### Step 6: Install in Production
 
 ```bash
 # Authenticate to production
@@ -216,7 +294,7 @@ sf package install \
 sf package installed list --target-org MyProd
 ```
 
-#### Generate Installation URLs
+### Step 7: Generate Installation URLs (Optional)
 
 For admins who prefer URL-based installation, construct URLs using the package version ID:
 
@@ -485,24 +563,21 @@ Means: Report 1 gets "Summary", Report 3 gets "Combined" as second dimension val
 
 **Property Name:** `Column Aliases (JSON)`
 
-**What it does:** Renames columns in the output grid. The original column names from your reports are replaced with friendlier display names.
+**What it does:** Renames columns and optionally overrides their number formatting. The original column names from your reports are replaced with friendlier display names, and you can control how numbers are displayed (currency symbols, decimal places, etc.).
 
 **Why you need it:**
 - Salesforce report columns have technical names like "Sum of Amount" or "Record Count"
 - You want cleaner labels like "Revenue" or "Total Deals"
 - Column names include report suffixes like "(2)" that you want to hide
+- You want to control number formatting (add/remove currency symbols, change decimal places)
 
-**Exact Syntax:**
+---
+
+#### Simple Syntax (Rename Only)
+
 ```json
-{"ORIGINAL_NAME": "NEW_NAME", "ORIGINAL_NAME_2": "NEW_NAME_2"}
+{"ORIGINAL_NAME": "NEW_NAME"}
 ```
-
-**Rules:**
-- Must be valid JSON (use double quotes)
-- Keys must **exactly match** the original column name (case-sensitive)
-- Use Debug Mode to see the exact original column names
-- You can alias any number of columns
-- Columns not listed keep their original names
 
 **Examples:**
 
@@ -511,20 +586,116 @@ Means: Report 1 gets "Summary", Report 3 gets "Combined" as second dimension val
 {"Record Count": "Total Deals", "Sum of Amount": "Revenue"}
 ```
 
-*Handling duplicate column names (Salesforce adds suffixes):*
+*Handling duplicate column names:*
 ```json
 {
   "Record Count": "Closed Deals",
-  "Record Count (2)": "Open Pipeline",
-  "Sum of Amount": "Closed Revenue",
-  "Sum of Amount (2)": "Pipeline Value"
+  "Record Count (2)": "Open Pipeline"
 }
 ```
 
-*Single column rename:*
+---
+
+#### Extended Syntax (Rename + Format)
+
 ```json
-{"Sum of Probability": "Win Rate %"}
+{
+  "ORIGINAL_NAME": {
+    "label": "NEW_NAME",
+    "format": "FORMAT_TYPE",
+    "decimals": NUMBER
+  }
+}
 ```
+
+**Format Options:**
+
+| Format | Output | Description |
+|--------|--------|-------------|
+| `currency` | `$1,234.56` | Currency with org's default symbol |
+| `currency:EUR` | `€1,234.56` | Currency with specific symbol |
+| `currency:GBP` | `£1,234.56` | British Pounds |
+| `percent` | `45.50%` | Percentage |
+| `percent:0` | `46%` | Percentage, no decimals |
+| `percent:1` | `45.5%` | Percentage, 1 decimal |
+| `number` | `1,234` | Number with thousand separators |
+| `number:2` | `1,234.56` | Number with 2 decimal places |
+| `number:0` | `1,234` | Whole number |
+| `none` | `1234.56` | Raw number, no formatting |
+
+**Extended Examples:**
+
+*Rename and format as currency:*
+```json
+{
+  "Sum of Amount": {
+    "label": "Revenue",
+    "format": "currency"
+  }
+}
+```
+Output: `$1,234.56`
+
+*Format with specific currency:*
+```json
+{
+  "Sum of Amount": {
+    "label": "Revenue (EUR)",
+    "format": "currency:EUR"
+  }
+}
+```
+Output: `€1,234.56`
+
+*Percentage with custom decimals:*
+```json
+{
+  "Sum of Probability": {
+    "label": "Win Rate",
+    "format": "percent",
+    "decimals": 1
+  }
+}
+```
+Output: `45.5%`
+
+*Remove currency formatting (show raw number):*
+```json
+{
+  "Sum of Amount": {
+    "label": "Amount",
+    "format": "none"
+  }
+}
+```
+Output: `1234.56`
+
+*Mixed simple and extended:*
+```json
+{
+  "Record Count": "Total Deals",
+  "Sum of Amount": {
+    "label": "Revenue",
+    "format": "currency"
+  },
+  "Sum of Probability": {
+    "label": "Win Rate",
+    "format": "percent:1"
+  }
+}
+```
+
+---
+
+#### Rules
+
+- Must be valid JSON (use double quotes)
+- Keys must **exactly match** the original column name (case-sensitive)
+- Use Debug Mode to see the exact original column names
+- Values can be either:
+  - A **string** (just renames the column)
+  - An **object** with `label`, `format`, and/or `decimals` (renames and formats)
+- Columns not listed keep their original names and default formatting
 
 **Finding Original Column Names:**
 1. Enable **Debug Mode** on the component
@@ -539,11 +710,11 @@ Means: Report 1 gets "Summary", Report 3 gets "Combined" as second dimension val
 // ❌ WRONG - Case mismatch
 {"record count": "Total"}
 
-// ❌ WRONG - Forgot the (2) suffix for second report's column
-{"Record Count": "Pipeline"}  // This only renames Report 1's column
+// ❌ WRONG - Invalid format type
+{"Sum of Amount": {"label": "Revenue", "format": "money"}}
 
-// ✅ CORRECT - Exact match including suffix
-{"Record Count (2)": "Pipeline Count"}
+// ✅ CORRECT - Valid format
+{"Sum of Amount": {"label": "Revenue", "format": "currency"}}
 ```
 
 ---
@@ -799,6 +970,5 @@ For issues or feature requests, contact your Salesforce administrator or the Dat
 
 ---
 
-**Version:** 1.3.0  
-**Package ID:** 04tPU000002A02PYAS  
+**Version:** 1.4.0  
 **Last Updated:** February 2026

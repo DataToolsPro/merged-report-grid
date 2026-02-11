@@ -99,12 +99,19 @@ public class MergedGridDTO {
         @AuraEnabled public String currencyCode { get; set; }
         @AuraEnabled public Integer reportIndex { get; set; }
         @AuraEnabled public List<Integer> sourceReportIndices { get; set; }
+        // Custom format override from column aliases
+        @AuraEnabled public String customFormat { get; set; }
+        @AuraEnabled public Integer customDecimals { get; set; }
+        @AuraEnabled public String customCurrencyCode { get; set; }
+        // Original label before alias (for format lookup)
+        public String originalLabel { get; set; }
         
         public ColumnDefinition() {
             this.isKeyColumn = false;
             this.isSecondKeyColumn = false;
             this.isMergedColumn = false;
             this.sourceReportIndices = new List<Integer>();
+            this.customDecimals = 2;
         }
         
         public ColumnDefinition(String key, String label, String dataType) {
@@ -115,6 +122,7 @@ public class MergedGridDTO {
             this.isSecondKeyColumn = false;
             this.isMergedColumn = false;
             this.sourceReportIndices = new List<Integer>();
+            this.customDecimals = 2;
         }
     }
     

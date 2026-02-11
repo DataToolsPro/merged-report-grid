@@ -104,7 +104,7 @@ private class MergedReportControllerTest {
     @IsTest
     static void testMergeOptionsGetColumnAlias() {
         MergeOptions options = new MergeOptions();
-        options.columnAliases = new Map<String, String>{
+        options.columnAliases = new Map<String, Object>{
             'Record Count' => 'Total',
             'Record Count (2)' => 'Other'
         };
@@ -389,7 +389,7 @@ private class MergedReportControllerTest {
             'sortDirection' => 'DESC',
             'maxRows' => 100,
             'showGrandTotalRow' => false,
-            'columnAliases' => new Map<String, String>{'Record Count' => 'Total'}
+            'columnAliases' => new Map<String, Object>{'Record Count' => 'Total'}
         });
         
         Test.startTest();
@@ -808,7 +808,7 @@ private class MergedReportControllerTest {
     @IsTest
     static void testMergeOptionsWithEmptyAliasMap() {
         MergeOptions options = new MergeOptions();
-        options.columnAliases = new Map<String, String>();
+        options.columnAliases = new Map<String, Object>();
         
         // Should return original when no alias exists
         System.assertEquals('Test Column', options.getColumnAlias('Test Column'));

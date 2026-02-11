@@ -73,17 +73,37 @@ public class MergeOptions {
     @AuraEnabled public Map<String, String> dimensionConstants { get; set; }
     
     /**
-     * @description Column aliases - maps original aggregate label to display alias
-     * Format: { "Record Count": "Metric_Value", "Sum of Amount": "Revenue" }
-     * Matches by EXACT column name (including suffix like "(2)")
+     * @description Column aliases and formatting - maps original column label to alias/format config
+     * Simple format: { "Record Count": "Total Deals" }
+     * Extended format: { "Sum of Amount": { "label": "Revenue", "format": "currency" } }
+     * Supported formats: currency, currency:EUR, percent, percent:0, number, number:2, none
      */
-    @AuraEnabled public Map<String, String> columnAliases { get; set; }
+    @AuraEnabled public Map<String, Object> columnAliases { get; set; }
     
     /**
      * @description Calculated fields configuration
      * Format: [{ "label": "Difference", "formula": "r1_RowCount - r2_RowCount" }]
      */
     @AuraEnabled public List<CalculatedField> calculatedFields { get; set; }
+    
+    /**
+     * @description Column configuration (parsed from columnAliases)
+     */
+    public class ColumnConfig {
+        public String label { get; set; }
+        public String format { get; set; }
+        public Integer decimals { get; set; }
+        public String currencyCode { get; set; }
+        
+        public ColumnConfig() {
+            this.decimals = 2;
+        }
+        
+        public ColumnConfig(String label) {
+            this.label = label;
+            this.decimals = 2;
+        }
+    }
     
     // Constants
     public static final String MERGE_MODE_OUTER_JOIN = 'OUTER_JOIN';
@@ -128,7 +148,7 @@ public class MergeOptions {
         this.subtotalLabel = DEFAULT_SUBTOTAL_LABEL;
         this.fillMissingCategories = false;
         this.dimensionConstants = new Map<String, String>();
-        this.columnAliases = new Map<String, String>();
+        this.columnAliases = new Map<String, Object>();
         this.calculatedFields = new List<CalculatedField>();
     }
     
@@ -211,7 +231,7 @@ public class MergeOptions {
             this.dimensionConstants = new Map<String, String>();
         }
         if (this.columnAliases == null) {
-            this.columnAliases = new Map<String, String>();
+            this.columnAliases = new Map<String, Object>();
         }
         if (this.calculatedFields == null) {
             this.calculatedFields = new List<CalculatedField>();
@@ -241,14 +261,108 @@ public class MergeOptions {
     }
     
     /**
+     * @description Gets the full column configuration for a label
+     * Parses both simple string format and extended object format
+     */
+    public ColumnConfig getColumnConfig(String originalLabel) {
+        if (this.columnAliases == null || !this.columnAliases.containsKey(originalLabel)) {
+            return null;
+        }
+        
+        Object configValue = this.columnAliases.get(originalLabel);
+        ColumnConfig config = new ColumnConfig();
+        
+        // Simple string format: { "Column": "Alias" }
+        if (configValue instanceof String) {
+            config.label = (String) configValue;
+            return config;
+        }
+        
+        // Extended object format: { "Column": { "label": "Alias", "format": "currency" } }
+        if (configValue instanceof Map<String, Object>) {
+            Map<String, Object> configMap = (Map<String, Object>) configValue;
+            
+            if (configMap.containsKey('label')) {
+                config.label = String.valueOf(configMap.get('label'));
+            }
+            
+            if (configMap.containsKey('format')) {
+                String formatStr = String.valueOf(configMap.get('format'));
+                // Parse format string like "currency:EUR" or "percent:1"
+                if (formatStr.contains(':')) {
+                    List<String> parts = formatStr.split(':');
+                    config.format = parts[0].toLowerCase();
+                    if (config.format == 'currency' && parts.size() > 1) {
+                        config.currencyCode = parts[1].toUpperCase();
+                    } else if ((config.format == 'percent' || config.format == 'number') && parts.size() > 1) {
+                        try {
+                            config.decimals = Integer.valueOf(parts[1]);
+                        } catch (Exception e) {
+                            config.decimals = 2;
+                        }
+                    }
+                } else {
+                    config.format = formatStr.toLowerCase();
+                }
+            }
+            
+            if (configMap.containsKey('decimals')) {
+                try {
+                    config.decimals = Integer.valueOf(configMap.get('decimals'));
+                } catch (Exception e) {
+                    config.decimals = 2;
+                }
+            }
+            
+            return config;
+        }
+        
+        return null;
+    }
+    
+    /**
      * @description Gets the alias for a column label, or returns the original if no match
      * Matches by EXACT original label - safe even if columns are reordered
      */
     public String getColumnAlias(String originalLabel) {
-        if (this.columnAliases != null && this.columnAliases.containsKey(originalLabel)) {
-            return this.columnAliases.get(originalLabel);
+        ColumnConfig config = getColumnConfig(originalLabel);
+        if (config != null && config.label != null) {
+            return config.label;
         }
         return originalLabel;
+    }
+    
+    /**
+     * @description Gets the custom format for a column, or null if not specified
+     */
+    public String getColumnFormat(String originalLabel) {
+        ColumnConfig config = getColumnConfig(originalLabel);
+        if (config != null) {
+            return config.format;
+        }
+        return null;
+    }
+    
+    /**
+     * @description Gets the decimal places for a column format
+     */
+    public Integer getColumnDecimals(String originalLabel) {
+        ColumnConfig config = getColumnConfig(originalLabel);
+        if (config != null && config.decimals != null) {
+            return config.decimals;
+        }
+        return 2;
+    }
+    
+    /**
+     * @description Gets the currency code for a column format
+     */
+    public String getColumnCurrencyCode(String originalLabel) {
+        ColumnConfig config = getColumnConfig(originalLabel);
+        if (config != null && config.currencyCode != null) {
+            return config.currencyCode;
+        }
+        return null;
     }
     
     /**

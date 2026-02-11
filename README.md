@@ -1,53 +1,117 @@
 # Merged Report Grid
 
-A Salesforce Lightning Web Component that merges 2-5 reports into a single unified grid.
+A Salesforce Lightning Web Component that merges 2-5 Salesforce reports into a single unified grid.
 
 ![Salesforce](https://img.shields.io/badge/Salesforce-00A1E0?style=flat&logo=salesforce&logoColor=white)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 
-## Overview
+## What Is This?
 
-This component allows Salesforce users to combine multiple reports into a single view, supporting:
+The Merged Report Grid is a Lightning Web Component that allows you to combine 2-5 Salesforce reports into a single, interactive grid view. This is perfect for:
+
+- **Comparing data across multiple reports** - See sales vs pipeline side-by-side
+- **Creating unified dashboards** - Combine different report types into one view
+- **Building custom analytics** - Merge reports with different groupings and add calculated fields
+- **Simplifying complex reporting** - Present multiple data sources in a single, easy-to-read format
+
+## What's Included
+
+This repository contains everything you need to deploy the component to your Salesforce org:
+
+### Apex Classes (4 classes)
+- `MergedReportController` - Main controller that fetches and merges reports via the Reports API
+- `MergedReportControllerTest` - Unit tests with 90%+ code coverage (required for production deployment)
+- `MergeOptions` - Configuration data transfer object
+- `MergedGridDTO` - Response data transfer object with nested classes
+
+### Lightning Web Component (1 component)
+- `mergedReportGrid` - The UI component that displays the merged grid in Lightning pages
+
+### Features
 
 - **Horizontal merges** (OUTER_JOIN, INNER_JOIN) - Compare data side-by-side
 - **Vertical stacks** (UNION) - Stack rows with subtotals
 - **Dimension Constants** - Merge reports with different grouping levels
+- **Column Aliases with Custom Formatting** - Rename columns and override number formats (currency, percent, decimals)
 - **Calculated Fields** - Add formula columns
 - **Smart Caching** - Optimized for App Builder and runtime
+- **Change Set Compatible** - Can be deployed via change sets from sandbox to production
+
+## Quick Start for Salesforce Admins
+
+### Prerequisites
+
+1. **Salesforce CLI** - Download from [developer.salesforce.com/tools/sfdxcli](https://developer.salesforce.com/tools/sfdxcli)
+2. **Access to this repository** - Either clone it or download as ZIP
+
+### Installation (Windows CMD)
+
+```cmd
+REM 1. Clone or download this repository
+git clone https://github.com/DataToolsPro/merged-report-grid.git
+cd merged-report-grid
+
+REM 2. Authenticate to your Salesforce org
+REM For Sandbox:
+sf org login web -a MySandbox --instance-url https://test.salesforce.com
+
+REM For Production:
+sf org login web -a MyProd --instance-url https://login.salesforce.com
+
+REM 3. Deploy to your org
+sf project deploy start -o MySandbox
+
+REM 4. Verify deployment (run tests)
+sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
+```
+
+### Installation (Windows PowerShell)
+
+```powershell
+# 1. Clone or download this repository
+git clone https://github.com/DataToolsPro/merged-report-grid.git
+cd merged-report-grid
+
+# 2. Authenticate to your Salesforce org
+# For Sandbox:
+sf org login web -a MySandbox --instance-url https://test.salesforce.com
+
+# For Production:
+sf org login web -a MyProd --instance-url https://login.salesforce.com
+
+# 3. Deploy to your org
+sf project deploy start -o MySandbox
+
+# 4. Verify deployment (run tests)
+sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
+```
+
+### Can This Be Deployed via Change Sets?
+
+**Yes!** This component can be deployed to a sandbox first, then moved to production using change sets. This is the traditional Salesforce deployment method.
+
+**Steps:**
+1. Deploy to sandbox using the CLI commands above
+2. In sandbox: Setup → Outbound Change Sets → Create change set
+3. Add all components (Apex classes and Lightning component)
+4. Upload change set to production
+5. In production: Setup → Inbound Change Sets → Deploy
+
+See the [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for detailed change set instructions.
 
 ## Documentation
 
 | Document | Audience | Contents |
 |----------|----------|----------|
-| **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | Salesforce Admins | Installation, deployment, configuration, usage, troubleshooting |
-| **README.md** (this file) | Developers | Architecture, development setup, contributing |
+| **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | Salesforce Admins | Complete installation guide, deployment options (CLI & change sets), configuration, usage, troubleshooting |
+| **README.md** (this file) | Everyone | Overview, what's included, quick start, project structure |
 
 ---
 
-## Project Structure
+## For Developers
 
-```
-force-app/main/default/
-├── classes/
-│   ├── MergedReportController.cls      # Main Apex controller
-│   ├── MergedReportController.cls-meta.xml
-│   ├── MergedReportControllerTest.cls  # Unit tests (90%+ coverage)
-│   ├── MergeOptions.cls                # Configuration DTO
-│   ├── MergeOptions.cls-meta.xml
-│   ├── MergedGridDTO.cls               # Response DTOs
-│   └── MergedGridDTO.cls-meta.xml
-└── lwc/
-    └── mergedReportGrid/
-        ├── mergedReportGrid.html       # Template
-        ├── mergedReportGrid.js         # Controller (wire + imperative Apex)
-        ├── mergedReportGrid.css        # Styles
-        └── mergedReportGrid.js-meta.xml # Lightning App Builder config
-```
-
----
-
-## Architecture
+If you're contributing to this project or need to understand the architecture:
 
 ### Data Flow
 
@@ -93,46 +157,50 @@ force-app/main/default/
 
 ---
 
-## Development Setup
+## Project Structure
 
-### Prerequisites
-
-- Salesforce CLI (`sf`)
-- Git
-- A Salesforce org (Sandbox recommended for development)
-
-### Local Development
-
-```bash
-# Clone the repository
-git clone https://github.com/DataToolsPro/merged-report-grid.git
-cd merged-report-grid
-
-# Authenticate to a sandbox
-sf org login web -a DevSandbox --instance-url https://test.salesforce.com
-
-# Deploy code
-sf project deploy start -o DevSandbox
-
-# Watch for changes (optional - requires VS Code Salesforce Extension)
-# Use VS Code's "SFDX: Deploy This Source to Org" on save
+```
+force-app/main/default/
+├── classes/
+│   ├── MergedReportController.cls      # Main Apex controller
+│   ├── MergedReportController.cls-meta.xml
+│   ├── MergedReportControllerTest.cls  # Unit tests (90%+ coverage)
+│   ├── MergedReportControllerTest.cls-meta.xml
+│   ├── MergeOptions.cls                # Configuration DTO
+│   ├── MergeOptions.cls-meta.xml
+│   ├── MergedGridDTO.cls               # Response DTOs
+│   └── MergedGridDTO.cls-meta.xml
+└── lwc/
+    └── mergedReportGrid/
+        ├── mergedReportGrid.html       # Template
+        ├── mergedReportGrid.js         # Controller (wire + imperative Apex)
+        ├── mergedReportGrid.css        # Styles
+        └── mergedReportGrid.js-meta.xml # Lightning App Builder config
 ```
 
-### Running Tests
+## Deployment Options
 
-```bash
-# Run Apex tests
-sf apex run test -n MergedReportControllerTest -o DevSandbox -r human -w 5
+### Option 1: Salesforce CLI (Recommended)
+Fastest method. Works for both sandbox and production. See Quick Start section above.
 
-# Run with code coverage
-sf apex run test -n MergedReportControllerTest -o DevSandbox -r human -w 5 -c
-```
+### Option 2: Change Sets
+Traditional Salesforce deployment method. Deploy to sandbox first, then create an outbound change set. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for detailed steps.
 
-### Debugging
+### Option 3: VS Code with Salesforce Extensions
+If you use VS Code, you can deploy individual files or the entire project using the Salesforce Extensions.
 
-1. Enable **Debug Mode** in the component properties
-2. Check browser console for LWC logs (prefixed with `[MergedReportGrid]`)
-3. Use Salesforce Developer Console for Apex debug logs
+## After Deployment
+
+Once deployed, you can add the component to any Lightning page:
+
+1. Navigate to **Setup → Lightning App Builder**
+2. Edit or create a Lightning page
+3. Find **"Merged Report Grid"** in the Components panel
+4. Drag it onto your page
+5. Configure with your report IDs and settings
+6. Save and Activate
+
+See [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for complete configuration instructions.
 
 ---
 
@@ -162,37 +230,9 @@ Reports with fewer dimensions than others get a constant value injected:
 
 ---
 
-## Package Management
+## Package Management (For Developers with PBO)
 
-The component uses Salesforce Unlocked Packages for distribution.
-
-### Current Package Info
-
-| Property | Value |
-|----------|-------|
-| Package Name | `MergedReportGrid` |
-| Package ID | `0HoPU000000k9k6WAA` |
-| Latest Version | `04tPU000002A02PYAS` (v1.3.0) |
-
-### Creating a New Version
-
-```bash
-# Ensure DevHub is authenticated
-sf config set target-dev-hub=DevHub
-
-# Create new package version
-sf package version create \
-  --package MergedReportGrid \
-  --installation-key-bypass \
-  --wait 10 \
-  --target-dev-hub DevHub \
-  --code-coverage
-
-# List versions
-sf package version list --packages MergedReportGrid --target-dev-hub DevHub
-```
-
-See [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for full deployment workflow.
+If you have a DevHub (Package Builder Org) and want to create unlocked packages for distribution, see the [ADMIN_GUIDE.md](ADMIN_GUIDE.md) section "For Developers with Package Builder Org (PBO)" for complete instructions.
 
 ---
 
@@ -205,6 +245,15 @@ See [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for full deployment workflow.
 | Grouping dimensions | 2 max | Summary reports only |
 
 ---
+
+## Support & Troubleshooting
+
+For detailed troubleshooting, configuration examples, and best practices, see the [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
+
+Common issues:
+- **"Report not found"** - Verify the 18-character report ID is correct
+- **"JOIN mode requires same dimensions"** - Use Dimension Constants or switch to UNION mode
+- **Missing data** - Check Data Visibility settings and report filters
 
 ## Contributing
 
@@ -230,6 +279,14 @@ See [LICENSE](LICENSE) file for details. For licensing inquiries, contact ryan@d
 
 ---
 
-**Version:** 1.3.0  
+**Version:** 1.4.0  
 **API Version:** 59.0  
 **Maintainer:** DataTools Pro
+
+---
+
+## Need Help?
+
+- **Installation & Deployment**: See [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
+- **Configuration & Usage**: See [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
+- **Troubleshooting**: See [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
