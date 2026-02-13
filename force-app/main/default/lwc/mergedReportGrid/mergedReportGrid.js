@@ -182,22 +182,72 @@ export default class MergedReportGrid extends LightningElement {
     }
     
     _buildOptionsJson() {
+        // JSON size warning thresholds (10KB is very generous - realistic max is ~5KB)
+        // These are warnings for debugging, not hard limits
+        const JSON_SIZE_WARNING = 10000; // 10KB - warn if larger
+        const JSON_SIZE_CRITICAL = 50000; // 50KB - critical warning
+        
         let columnAliases = {};
         if (this.columnAliasesJson) {
-            try { columnAliases = JSON.parse(this.columnAliasesJson); } 
-            catch (e) { /* ignore */ }
+            const size = this.columnAliasesJson.length;
+            if (size > JSON_SIZE_CRITICAL) {
+                this.showToast('Warning', `Column Aliases JSON is very large (${Math.round(size/1024)}KB). This may cause performance issues.`, 'warning');
+            } else if (size > JSON_SIZE_WARNING) {
+                this.showToast('Info', `Column Aliases JSON is large (${Math.round(size/1024)}KB). If you experience issues, consider reducing aliases.`, 'info');
+            }
+            try { 
+                const parsed = JSON.parse(this.columnAliasesJson);
+                // Validate structure - must be an object, not array
+                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
+                    columnAliases = parsed;
+                } else {
+                    this.showToast('Warning', 'Column Aliases should be a JSON object (e.g., {"Column": "Alias"}). Using empty object.', 'warning');
+                }
+            } catch (e) {
+                this.showToast('Warning', 'Invalid Column Aliases JSON: ' + (e.message || 'Parse error') + '. Using empty object.', 'warning');
+            }
         }
         
         let calculatedFields = [];
         if (this.calculatedFieldsJson) {
-            try { calculatedFields = JSON.parse(this.calculatedFieldsJson); } 
-            catch (e) { /* ignore */ }
+            const size = this.calculatedFieldsJson.length;
+            if (size > JSON_SIZE_CRITICAL) {
+                this.showToast('Warning', `Calculated Fields JSON is very large (${Math.round(size/1024)}KB). This may cause performance issues.`, 'warning');
+            } else if (size > JSON_SIZE_WARNING) {
+                this.showToast('Info', `Calculated Fields JSON is large (${Math.round(size/1024)}KB). If you experience issues, consider reducing calculated fields.`, 'info');
+            }
+            try { 
+                const parsed = JSON.parse(this.calculatedFieldsJson);
+                // Validate structure - must be an array
+                if (Array.isArray(parsed)) {
+                    calculatedFields = parsed;
+                } else {
+                    this.showToast('Warning', 'Calculated Fields should be a JSON array (e.g., [{"label": "...", "formula": "..."}]). Using empty array.', 'warning');
+                }
+            } catch (e) {
+                this.showToast('Warning', 'Invalid Calculated Fields JSON: ' + (e.message || 'Parse error') + '. Using empty array.', 'warning');
+            }
         }
         
         let dimensionConstants = {};
         if (this.dimensionConstantsJson) {
-            try { dimensionConstants = JSON.parse(this.dimensionConstantsJson); } 
-            catch (e) { /* ignore */ }
+            const size = this.dimensionConstantsJson.length;
+            if (size > JSON_SIZE_CRITICAL) {
+                this.showToast('Warning', `Dimension Constants JSON is very large (${Math.round(size/1024)}KB). This may cause performance issues.`, 'warning');
+            } else if (size > JSON_SIZE_WARNING) {
+                this.showToast('Info', `Dimension Constants JSON is large (${Math.round(size/1024)}KB).`, 'info');
+            }
+            try { 
+                const parsed = JSON.parse(this.dimensionConstantsJson);
+                // Validate structure - must be an object
+                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
+                    dimensionConstants = parsed;
+                } else {
+                    this.showToast('Warning', 'Dimension Constants should be a JSON object (e.g., {"1": "Total"}). Using empty object.', 'warning');
+                }
+            } catch (e) {
+                this.showToast('Warning', 'Invalid Dimension Constants JSON: ' + (e.message || 'Parse error') + '. Using empty object.', 'warning');
+            }
         }
         
         const options = {
@@ -231,20 +281,32 @@ export default class MergedReportGrid extends LightningElement {
     _buildStableOptionsJson() {
         let columnAliases = {};
         if (this.columnAliasesJson) {
-            try { columnAliases = JSON.parse(this.columnAliasesJson); } 
-            catch (e) { /* ignore */ }
+            try { 
+                const parsed = JSON.parse(this.columnAliasesJson);
+                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
+                    columnAliases = parsed;
+                }
+            } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
         }
         
         let calculatedFields = [];
         if (this.calculatedFieldsJson) {
-            try { calculatedFields = JSON.parse(this.calculatedFieldsJson); } 
-            catch (e) { /* ignore */ }
+            try { 
+                const parsed = JSON.parse(this.calculatedFieldsJson);
+                if (Array.isArray(parsed)) {
+                    calculatedFields = parsed;
+                }
+            } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
         }
         
         let dimensionConstants = {};
         if (this.dimensionConstantsJson) {
-            try { dimensionConstants = JSON.parse(this.dimensionConstantsJson); } 
-            catch (e) { /* ignore */ }
+            try { 
+                const parsed = JSON.parse(this.dimensionConstantsJson);
+                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
+                    dimensionConstants = parsed;
+                }
+            } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
         }
         
         // Same as _buildOptionsJson but WITHOUT the cache buster

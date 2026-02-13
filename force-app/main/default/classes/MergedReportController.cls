@@ -1362,8 +1362,15 @@ public with sharing class MergedReportController {
     
     /**
      * @description Resolves display labels in formula to internal column keys
+     * Uses word boundaries to prevent partial matches and validates formula safety
      */
     private static String resolveFormulaLabels(String formula, Map<String, String> labelToKey, MergedGridDTO result) {
+        // Validate formula contains only safe characters (alphanumeric, spaces, operators, parentheses)
+        if (!Pattern.matches('^[a-zA-Z0-9_() +\\-*/\\s]+$', formula)) {
+            result.warnings.add('Calculated field formula contains invalid characters. Only letters, numbers, spaces, and operators (+, -, *, /) are allowed.');
+            return null;
+        }
+        
         String resolved = formula;
         
         // Extract tokens from formula (split by operators)
@@ -1377,12 +1384,20 @@ public with sharing class MergedReportController {
             }
         }
         
-        // Resolve each token
+        // Sort tokens by length (longest first) to avoid partial matches
+        // Example: "Amount (2)" should match before "Amount"
+        List<String> sortedTokens = new List<String>(tokens);
+        sortedTokens.sort(new TokenLengthComparator());
+        
+        // Resolve each token using word boundaries to prevent partial matches
         List<String> unresolvedTokens = new List<String>();
-        for (String token : tokens) {
+        for (String token : sortedTokens) {
             if (labelToKey.containsKey(token)) {
-                // Replace display label with internal key
-                resolved = resolved.replace(token, labelToKey.get(token));
+                // Use word boundary regex to ensure exact token match
+                // Escape special regex characters in token
+                String escapedToken = Pattern.quote(token);
+                // Replace with word boundaries to avoid partial matches
+                resolved = resolved.replaceAll('\\b' + escapedToken + '\\b', labelToKey.get(token));
             } else {
                 unresolvedTokens.add(token);
             }
@@ -1407,13 +1422,32 @@ public with sharing class MergedReportController {
     }
     
     /**
+     * @description Comparator to sort tokens by length (longest first)
+     * This prevents partial matches when replacing tokens in formulas
+     */
+    private class TokenLengthComparator implements Comparator<String> {
+        public Integer compare(String a, String b) {
+            if (a.length() > b.length()) return -1;
+            if (a.length() < b.length()) return 1;
+            return a.compareTo(b);
+        }
+    }
+    
+    /**
      * @description Evaluates a simple formula
+     * Validates formula safety before evaluation
      */
     private static Decimal evaluateFormula(String formula, Map<String, Decimal> values) {
         if (String.isBlank(formula) || values == null) return null;
         
         try {
             formula = formula.trim();
+            
+            // Additional safety check: ensure formula only contains valid characters
+            // This is a defense-in-depth measure (already validated in resolveFormulaLabels)
+            if (!Pattern.matches('^[a-zA-Z0-9_() +\\-*/\\s]+$', formula)) {
+                return null;
+            }
             
             if (formula.contains(' + ')) {
                 List<String> parts = formula.split(' \\+ ');
