@@ -2,7 +2,6 @@
  * @description Controller for the Merged Report Grid LWC component.
  *              Handles fetching, validating, and merging data from multiple Salesforce reports.
  *              Supports JOIN (horizontal merge) and UNION (vertical stack) strategies.
- * @author DataTools Pro
  */
 public with sharing class MergedReportController {
     

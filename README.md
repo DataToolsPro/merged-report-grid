@@ -3,7 +3,7 @@
 A Salesforce Lightning Web Component that merges 2-5 Salesforce reports into a single unified grid.
 
 ![Salesforce](https://img.shields.io/badge/Salesforce-00A1E0?style=flat&logo=salesforce&logoColor=white)
-![License](https://img.shields.io/badge/license-Proprietary-red)
+![License](https://img.shields.io/badge/license-MIT-green)
 ![Version](https://img.shields.io/badge/version-1.4.0-blue)
 
 ## What Is This?
@@ -49,7 +49,7 @@ This repository contains everything you need to deploy the component to your Sal
 
 ```cmd
 REM 1. Clone or download this repository
-git clone https://github.com/DataToolsPro/merged-report-grid.git
+git clone <repository-url>
 cd merged-report-grid
 
 REM 2. Authenticate to your Salesforce org
@@ -70,7 +70,7 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 
 ```powershell
 # 1. Clone or download this repository
-git clone https://github.com/DataToolsPro/merged-report-grid.git
+git clone <repository-url>
 cd merged-report-grid
 
 # 2. Authenticate to your Salesforce org
@@ -230,9 +230,6 @@ Reports with fewer dimensions than others get a constant value injected:
 
 ---
 
-## Package Management (For Developers with PBO)
-
-If you have a DevHub (Package Builder Org) and want to create unlocked packages for distribution, see the [ADMIN_GUIDE.md](ADMIN_GUIDE.md) section "For Developers with Package Builder Org (PBO)" for complete instructions.
 
 ---
 
@@ -273,15 +270,12 @@ Common issues:
 
 ## License
 
-**Proprietary** - Copyright © 2024-2026 DataTools Pro. All Rights Reserved.
-
-See [LICENSE](LICENSE) file for details. For licensing inquiries, contact ryan@datatoolspro.com.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 **Version:** 1.4.0  
-**API Version:** 59.0  
-**Maintainer:** DataTools Pro
+**API Version:** 59.0
 
 ---
 

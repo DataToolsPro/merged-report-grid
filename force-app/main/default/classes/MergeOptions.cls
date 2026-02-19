@@ -1,6 +1,5 @@
 /**
  * @description Options for configuring the merged report grid behavior
- * @author DataTools Pro
  */
 public class MergeOptions {
     

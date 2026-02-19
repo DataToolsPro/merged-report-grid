@@ -42,7 +42,7 @@ export default class MergedReportGrid extends LightningElement {
     // Debug Mode
     @api debugMode = false;
     
-    // Cache buster (required by managed package, not functionally used)
+    // Cache buster (legacy property, not functionally used)
     @api refreshKey;
     
     // ===== Internal State =====

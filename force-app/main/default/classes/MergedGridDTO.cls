@@ -1,6 +1,5 @@
 /**
  * @description Data Transfer Object for merged report grid results
- * @author DataTools Pro
  */
 public class MergedGridDTO {
     

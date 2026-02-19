@@ -2,7 +2,6 @@
  * @description Comprehensive unit tests for MergedReportController
  *              Tests all data shapes: JOIN/UNION modes, 1/2 dimensions, 
  *              column merging, subtotals, fill missing, sorting, etc.
- * @author DataTools Pro
  */
 @IsTest
 private class MergedReportControllerTest {

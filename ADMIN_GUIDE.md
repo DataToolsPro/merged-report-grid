@@ -9,9 +9,6 @@ A Lightning Web Component that merges 2-5 Salesforce reports into a single unifi
 ## Table of Contents
 
 1. [Installation & Deployment](#installation--deployment)
-   - [For Individual Admins (Source Code Access)](#for-individual-admins-source-code-access)
-   - [For Developers with Package Builder Org (PBO)](#for-developers-with-package-builder-org-pbo)
-2. [Adding to Lightning Pages](#adding-to-lightning-pages)
 2. [Adding to Lightning Pages](#adding-to-lightning-pages)
 3. [Configuration Properties](#configuration-properties)
 4. [Merge Modes](#merge-modes)
@@ -29,16 +26,7 @@ A Lightning Web Component that merges 2-5 Salesforce reports into a single unifi
 
 ## Installation & Deployment
 
-This guide provides deployment instructions for two different scenarios:
-
-- **Individual Salesforce Admins** - You have access to the source code repository and want to deploy directly to your org
-- **Developers with Package Builder Org (PBO)** - You have a DevHub/PBO and want to create and distribute packages
-
----
-
-## For Individual Admins (Source Code Access)
-
-If you have access to this GitHub repository, you can deploy the component directly to your Salesforce org using one of these methods:
+This guide provides deployment instructions for deploying the component directly to your Salesforce org using one of these methods:
 
 ### Prerequisites
 
@@ -57,7 +45,7 @@ This is the fastest method for deploying to a sandbox or production org.
 
 ```cmd
 REM 1. Clone the repository (or download and extract the ZIP)
-git clone https://github.com/DataToolsPro/merged-report-grid.git
+git clone <repository-url>
 cd merged-report-grid
 
 REM 2. Authenticate to your org
@@ -78,7 +66,7 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 
 ```powershell
 # 1. Clone the repository (or download and extract the ZIP)
-git clone https://github.com/DataToolsPro/merged-report-grid.git
+git clone <repository-url>
 cd merged-report-grid
 
 # 2. Authenticate to your org
@@ -99,7 +87,7 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 
 ```bash
 # 1. Clone the repository (or download and extract the ZIP)
-git clone https://github.com/DataToolsPro/merged-report-grid.git
+git clone <repository-url>
 cd merged-report-grid
 
 # 2. Authenticate to your org
@@ -163,7 +151,7 @@ Use Method 1 above to deploy to your sandbox, or use VS Code with Salesforce Ext
 
 > ⚠️ **Important:** Change sets require all Apex tests to pass. The `MergedReportControllerTest` class will run automatically during deployment.
 
-### What's Included in This Package
+### What's Included
 
 This repository contains:
 
@@ -187,160 +175,6 @@ This repository contains:
 - [ ] Verify all functionality works as expected
 - [ ] Deploy to production (via CLI or change set)
 - [ ] Add component to Lightning pages
-
----
-
-## For Developers with Package Builder Org (PBO)
-
-If you have a DevHub (Package Builder Org) and want to create an unlocked package for distribution across multiple orgs, follow this workflow.
-
-### Prerequisites for Packaging
-
-1. **DevHub Enabled** in your production org:
-   - Setup → Dev Hub → Enable
-   
-2. **Authenticate to DevHub:**
-```bash
-sf org login web -a DevHub --instance-url https://login.salesforce.com
-sf config set target-dev-hub=DevHub
-```
-
-### Step 1: Create a Package (One-Time)
-
-Skip if the package already exists in your DevHub.
-
-```bash
-sf package create \
-  --name MergedReportGrid \
-  --package-type Unlocked \
-  --path force-app \
-  --target-dev-hub DevHub \
-  --description "Merged Report Grid - Combines 2-5 Salesforce reports"
-```
-
-This creates a package ID (starts with `0Ho`) stored in `sfdx-project.json`.
-
-### Step 2: Create a Package Version
-
-Run this whenever you need to deploy updates:
-
-```bash
-# Create a beta package version
-sf package version create \
-  --package MergedReportGrid \
-  --installation-key-bypass \
-  --wait 10 \
-  --target-dev-hub DevHub \
-  --code-coverage
-
-# Note the version ID (04t...) from the output
-```
-
-The `--code-coverage` flag ensures tests pass and coverage is calculated.
-
-### Step 3: Install in Sandbox for Testing
-
-```bash
-# List package versions to get the ID:
-sf package version list --packages MergedReportGrid --target-dev-hub DevHub
-
-# Install in sandbox (replace 04tXXX with your version ID)
-sf package install \
-  --package 04tXXXXXXXXXXXXXXX \
-  --target-org MySandbox \
-  --wait 10
-
-# Verify installation
-sf package installed list --target-org MySandbox
-```
-
-### Step 4: Test in Sandbox
-
-1. Open the sandbox
-2. Navigate to a Lightning page in App Builder
-3. Add the "Merged Report Grid" component
-4. Configure with test reports
-5. Verify functionality
-
-### Step 5: Promote for Production
-
-Once testing is complete, promote the package version to "Released" status:
-
-```bash
-# Promote the version (required before production install)
-sf package version promote \
-  --package 04tXXXXXXXXXXXXXXX \
-  --target-dev-hub DevHub
-
-# Verify promotion (should show IsReleased = true)
-sf package version list --packages MergedReportGrid --released --target-dev-hub DevHub
-```
-
-> ⚠️ **Important:** Only promoted (released) versions can be installed in production orgs.
-
-### Step 6: Install in Production
-
-```bash
-# Authenticate to production
-sf org login web -a MyProd --instance-url https://login.salesforce.com
-
-# Install the promoted package
-sf package install \
-  --package 04tXXXXXXXXXXXXXXX \
-  --target-org MyProd \
-  --wait 10
-
-# Verify installation
-sf package installed list --target-org MyProd
-```
-
-### Step 7: Generate Installation URLs (Optional)
-
-For admins who prefer URL-based installation, construct URLs using the package version ID:
-
-```
-Sandbox:    https://test.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
-Production: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tXXXXXXXXXXXXXXX
-```
-
----
-
-### Upgrade Existing Installation
-
-To upgrade an org that already has the package installed:
-
-```bash
-sf package install \
-  --package 04tNEWVERSIONID \
-  --target-org MyOrg \
-  --wait 10 \
-  --upgrade-type Mixed
-```
-
----
-
-### Deployment Workflow Summary
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     DEPLOYMENT WORKFLOW                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. CREATE VERSION                                               │
-│     └── sf package version create ... (creates 04t ID)          │
-│                                                                  │
-│  2. TEST IN SANDBOX                                              │
-│     └── sf package install ... --target-org Sandbox             │
-│     └── Manual testing in App Builder                           │
-│                                                                  │
-│  3. PROMOTE                                                      │
-│     └── sf package version promote ... (marks as released)      │
-│                                                                  │
-│  4. DEPLOY TO PRODUCTION                                         │
-│     └── sf package install ... --target-org Production          │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -966,7 +800,7 @@ When using multiple Merged Report Grid components on the same page:
 
 ## Support
 
-For issues or feature requests, contact your Salesforce administrator or the DataTools Pro team.
+For issues or feature requests, please open an issue in the repository.
 
 ---
 
