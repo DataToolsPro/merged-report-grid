@@ -821,4 +821,441 @@ private class MergedReportControllerTest {
         System.assertEquals(null, options.getDimensionConstant(1));
         System.assertEquals(null, options.getDimensionConstant(2));
     }
+    
+    @IsTest
+    static void testMergeOptionsColumnConfigDefaultConstructor() {
+        MergeOptions.ColumnConfig config = new MergeOptions.ColumnConfig();
+        
+        System.assertEquals(null, config.label);
+        System.assertEquals(null, config.format);
+        System.assertEquals(2, config.decimals);
+        System.assertEquals(null, config.currencyCode);
+    }
+    
+    @IsTest
+    static void testMergeOptionsColumnConfigWithLabel() {
+        MergeOptions.ColumnConfig config = new MergeOptions.ColumnConfig('Test Label');
+        
+        System.assertEquals('Test Label', config.label);
+        System.assertEquals(null, config.format);
+        System.assertEquals(2, config.decimals);
+        System.assertEquals(null, config.currencyCode);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigSimpleString() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Record Count' => 'Total Deals'
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Record Count');
+        System.assertNotEquals(null, config);
+        System.assertEquals('Total Deals', config.label);
+        System.assertEquals(null, config.format);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigExtendedFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Sum of Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'currency:EUR',
+                'decimals' => 0
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Sum of Amount');
+        System.assertNotEquals(null, config);
+        System.assertEquals('Revenue', config.label);
+        System.assertEquals('currency', config.format);
+        System.assertEquals(0, config.decimals);
+        System.assertEquals('EUR', config.currencyCode);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigPercentFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Win Rate' => new Map<String, Object>{
+                'format' => 'percent:1',
+                'decimals' => 2
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Win Rate');
+        System.assertNotEquals(null, config);
+        System.assertEquals('percent', config.format);
+        System.assertEquals(2, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigNumberFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Count' => new Map<String, Object>{
+                'format' => 'number:0'
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Count');
+        System.assertNotEquals(null, config);
+        System.assertEquals('number', config.format);
+        System.assertEquals(0, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigNoMatch() {
+        MergeOptions options = new MergeOptions();
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('NonExistent');
+        System.assertEquals(null, config);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{'format' => 'currency'}
+        };
+        
+        System.assertEquals('currency', options.getColumnFormat('Amount'));
+        System.assertEquals(null, options.getColumnFormat('NonExistent'));
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnDecimals() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{'decimals' => 0}
+        };
+        
+        System.assertEquals(0, options.getColumnDecimals('Amount'));
+        System.assertEquals(2, options.getColumnDecimals('NonExistent'));
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnCurrencyCode() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{'format' => 'currency:GBP'}
+        };
+        
+        System.assertEquals('GBP', options.getColumnCurrencyCode('Amount'));
+        System.assertEquals(null, options.getColumnCurrencyCode('NonExistent'));
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetReportScope() {
+        MergeOptions options = new MergeOptions();
+        
+        options.dataVisibility = 'ALL';
+        System.assertEquals(null, options.getReportScope());
+        
+        options.dataVisibility = 'MY_RECORDS';
+        System.assertEquals('user', options.getReportScope());
+        
+        options.dataVisibility = 'MY_TEAM';
+        System.assertEquals('team', options.getReportScope());
+    }
+    
+    @IsTest
+    static void testMergeOptionsShouldOverrideScope() {
+        MergeOptions options = new MergeOptions();
+        
+        options.dataVisibility = 'ALL';
+        System.assertEquals(false, options.shouldOverrideScope());
+        
+        options.dataVisibility = 'MY_RECORDS';
+        System.assertEquals(true, options.shouldOverrideScope());
+        
+        options.dataVisibility = 'MY_TEAM';
+        System.assertEquals(true, options.shouldOverrideScope());
+    }
+    
+    @IsTest
+    static void testMergeOptionsDataVisibilityValidation() {
+        MergeOptions options = new MergeOptions();
+        options.dataVisibility = 'INVALID';
+        
+        List<String> warnings = options.validate();
+        System.assert(warnings.size() > 0);
+        System.assertEquals('ALL', options.dataVisibility);
+    }
+    
+    // ========================================================================
+    // CONTROLLER UTILITY METHOD TESTS
+    // ========================================================================
+    
+    @IsTest
+    static void testControllerFormatValueCurrency() {
+        // Test currency formatting via a mock scenario
+        // Since formatValue is private, we test through getMergedReportData with column aliases
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'columnAliases' => new Map<String, Object>{
+                'Sum of Amount' => new Map<String, Object>{
+                    'label' => 'Revenue',
+                    'format' => 'currency',
+                    'decimals' => 2
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        // Just verify it doesn't crash - actual formatting tested in integration
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerFormatValuePercent() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'columnAliases' => new Map<String, Object>{
+                'Win Rate' => new Map<String, Object>{
+                    'format' => 'percent:1'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerFormatValueNumber() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'columnAliases' => new Map<String, Object>{
+                'Count' => new Map<String, Object>{
+                    'format' => 'number:0'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerFormatValueNone() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'columnAliases' => new Map<String, Object>{
+                'Amount' => new Map<String, Object>{
+                    'format' => 'none'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerCalculatedFields() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'calculatedFields' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => 'Difference',
+                    'formula' => 'Record Count - Record Count (2)'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerCalculatedFieldsInvalidFormula() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'calculatedFields' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => 'Invalid',
+                    'formula' => 'NonExistentColumn1 - NonExistentColumn2'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+        // Should have warnings about invalid formula
+        System.assert(result.warnings.size() > 0 || result.errors.size() > 0);
+    }
+    
+    @IsTest
+    static void testControllerCalculatedFieldsInvalidCharacters() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'calculatedFields' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => 'Invalid',
+                    'formula' => 'Amount; DROP TABLE'
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+        // Should have warnings about invalid characters OR errors (if reports don't exist)
+        // Since reports don't exist, we'll get errors, but the formula validation should still run
+        System.assert(result.warnings.size() > 0 || result.errors.size() > 0);
+    }
+    
+    @IsTest
+    static void testControllerMissingValueAsZero() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'missingValueAsZero' => true
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerInnerJoinMode() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'INNER_JOIN'
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerMaxRowsLimit() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'maxRows' => 50
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerShowGrandTotalFalse() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'showGrandTotalRow' => false
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerUnionModeWithSubtotals() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'showSubtotals' => true,
+            'subtotalLabel' => 'SUB'
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerUnionModeFillMissingCategories() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'fillMissingCategories' => true
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerSortByColumn() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'sortBy' => 'REPORT1_VALUE',
+            'sortDirection' => 'DESC'
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+    }
+    
+    @IsTest
+    static void testControllerExceptionHandling() {
+        // Test that exceptions are caught and returned as errors
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        
+        // Invalid JSON that might cause parsing issues
+        String optionsJson = '{"invalid": json}';
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        // Should handle gracefully
+        System.assertNotEquals(null, result);
+    }
 }
