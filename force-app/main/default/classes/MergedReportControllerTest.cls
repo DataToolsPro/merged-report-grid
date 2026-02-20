@@ -955,10 +955,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur (may be due to data differences)
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         }
     }
     
@@ -1082,10 +1086,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors');
         }
@@ -1341,11 +1349,15 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             // If errors occur, just verify basic structure - may be due to data differences
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             // Only assert on success conditions when there are no errors
             System.assertEquals(0, result.errors.size(), 'Should have no errors with matching dimensions');
@@ -1378,10 +1390,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors with valid reports');
         }
@@ -1408,10 +1424,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors with matching 2D dimensions');
             System.assertEquals(true, result.hasSecondDimension, 'Should have second dimension for 2D reports');
@@ -1439,10 +1459,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors with matching 2D dimensions');
             System.assertEquals(true, result.hasSecondDimension, 'Should have second dimension for 2D reports');
@@ -1475,10 +1499,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors');
         }
@@ -1507,10 +1535,14 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors');
         }
@@ -1534,8 +1566,21 @@ private class MergedReportControllerTest {
         Test.stopTest();
         
         System.assertNotEquals(null, result);
-        System.assertEquals(0, result.errors.size(), 'Should have no errors');
         System.assertNotEquals(null, result.columns);
+        
+        // Log errors for debugging if they occur
+        if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
+            for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
+                System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
+            }
+            System.debug('Test completed with errors - this may be due to data differences in production');
+            // Include actual error in assertion message for better visibility
+            System.assertEquals(0, result.errors.size(), errorMsg);
+        } else {
+            System.assertEquals(0, result.errors.size(), 'Should have no errors');
+        }
     }
     
     @IsTest(SeeAllData=true)
@@ -1559,10 +1604,13 @@ private class MergedReportControllerTest {
         
         // Log errors for debugging if they occur (may be due to data differences)
         if (result.errors.size() > 0) {
+            String errorMsg = 'Errors occurred: ';
             for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + ' (Report: ' + err.reportId + '); ';
                 System.debug('Report Error: ' + err.message + ' (Report: ' + err.reportId + ')');
             }
             System.debug('Test completed with errors - this may be due to data differences in production');
+            // Note: This test doesn't assert on errors, just logs them for visibility
         }
     }
 }
