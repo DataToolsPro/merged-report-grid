@@ -128,6 +128,223 @@ private class MergedReportControllerTest {
         
         options.sortBy = 'INVALID';
         System.assertEquals(0, options.getSortColumnIndex());
+        
+        // Test exception handling with invalid REPORT format
+        options.sortBy = 'REPORT_INVALID_VALUE';
+        System.assertEquals(0, options.getSortColumnIndex()); // Should return 0 on exception
+        
+        options.sortBy = 'REPORTABC_VALUE';
+        System.assertEquals(0, options.getSortColumnIndex()); // Should return 0 on exception
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigSimpleString() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Record Count' => 'Total Records'
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Record Count');
+        System.assertNotEquals(null, config);
+        System.assertEquals('Total Records', config.label);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigExtendedFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'currency'
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Amount');
+        System.assertNotEquals(null, config);
+        System.assertEquals('Revenue', config.label);
+        System.assertEquals('currency', config.format);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigNumberFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Percent' => new Map<String, Object>{
+                'label' => 'Percentage',
+                'format' => 'percent:1'
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Percent');
+        System.assertNotEquals(null, config);
+        System.assertEquals('Percentage', config.label);
+        System.assertEquals('percent', config.format);
+        System.assertEquals(1, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigCurrencyCode() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'currency:EUR'
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Amount');
+        System.assertNotEquals(null, config);
+        System.assertEquals('EUR', config.currencyCode);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigWithDecimals() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'number',
+                'decimals' => 3
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Amount');
+        System.assertNotEquals(null, config);
+        System.assertEquals(3, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigInvalidDecimals() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'number:invalid',
+                'decimals' => 'not-a-number'
+            }
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Amount');
+        System.assertNotEquals(null, config);
+        // Should default to 2 when invalid
+        System.assertEquals(2, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnFormat() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'currency'
+            }
+        };
+        
+        System.assertEquals('currency', options.getColumnFormat('Amount'));
+        System.assertEquals(null, options.getColumnFormat('NonExistent'));
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnDecimals() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'number',
+                'decimals' => 4
+            }
+        };
+        
+        System.assertEquals(4, options.getColumnDecimals('Amount'));
+        System.assertEquals(2, options.getColumnDecimals('NonExistent')); // Default
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnCurrencyCode() {
+        MergeOptions options = new MergeOptions();
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => new Map<String, Object>{
+                'label' => 'Revenue',
+                'format' => 'currency:GBP'
+            }
+        };
+        
+        System.assertEquals('GBP', options.getColumnCurrencyCode('Amount'));
+        System.assertEquals(null, options.getColumnCurrencyCode('NonExistent'));
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetReportScope() {
+        MergeOptions options = new MergeOptions();
+        
+        // Default (ALL) should return null
+        System.assertEquals(null, options.getReportScope());
+        
+        // MY_RECORDS should return 'user'
+        options.dataVisibility = MergeOptions.DATA_VISIBILITY_MY_RECORDS;
+        System.assertEquals('user', options.getReportScope());
+        
+        // MY_TEAM should return 'team'
+        options.dataVisibility = MergeOptions.DATA_VISIBILITY_MY_TEAM;
+        System.assertEquals('team', options.getReportScope());
+    }
+    
+    @IsTest
+    static void testMergeOptionsShouldOverrideScope() {
+        MergeOptions options = new MergeOptions();
+        
+        // Default (ALL) should not override
+        System.assertEquals(false, options.shouldOverrideScope());
+        
+        // MY_RECORDS should override
+        options.dataVisibility = MergeOptions.DATA_VISIBILITY_MY_RECORDS;
+        System.assertEquals(true, options.shouldOverrideScope());
+        
+        // MY_TEAM should override
+        options.dataVisibility = MergeOptions.DATA_VISIBILITY_MY_TEAM;
+        System.assertEquals(true, options.shouldOverrideScope());
+    }
+    
+    @IsTest
+    static void testMergeOptionsColumnConfigDefaultConstructor() {
+        MergeOptions.ColumnConfig config = new MergeOptions.ColumnConfig();
+        System.assertEquals(2, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsColumnConfigWithLabel() {
+        MergeOptions.ColumnConfig config = new MergeOptions.ColumnConfig('Test Label');
+        System.assertEquals('Test Label', config.label);
+        System.assertEquals(2, config.decimals);
+    }
+    
+    @IsTest
+    static void testMergeOptionsDataVisibilityValidation() {
+        MergeOptions options = new MergeOptions();
+        options.dataVisibility = 'INVALID_VISIBILITY';
+        
+        List<String> warnings = options.validate();
+        
+        System.assertEquals(MergeOptions.DATA_VISIBILITY_ALL, options.dataVisibility);
+        System.assert(warnings.size() > 0, 'Should have warning for invalid dataVisibility');
+        System.assert(warnings[0].contains('Invalid dataVisibility'), 'Warning should mention invalid dataVisibility');
+    }
+    
+    @IsTest
+    static void testMergeOptionsGetColumnConfigInvalidType() {
+        MergeOptions options = new MergeOptions();
+        // Test with configValue that is neither String nor Map (e.g., Integer)
+        options.columnAliases = new Map<String, Object>{
+            'Amount' => 12345  // Not a String or Map, should return null
+        };
+        
+        MergeOptions.ColumnConfig config = options.getColumnConfig('Amount');
+        System.assertEquals(null, config);
+        
+        // Test with null columnAliases
+        options.columnAliases = null;
+        config = options.getColumnConfig('Amount');
+        System.assertEquals(null, config);
     }
     
     @IsTest
