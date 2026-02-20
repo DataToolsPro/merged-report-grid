@@ -15,6 +15,10 @@ public with sharing class MergedReportController {
     private static final String BLANK_KEY_TOKEN = '(Blank)';
     private static final String KEY_SEPARATOR = '||';
     
+    // Debug flag: Set to true to include stack traces in error messages (for debugging only)
+    // SECURITY: Keep this false in production to prevent information disclosure
+    private static final Boolean INCLUDE_STACK_TRACES_IN_ERRORS = false;
+    
     /**
      * @description Main entry point - fetches and merges data from multiple reports
      * @param reportIds List of report IDs to merge (2-5 reports)
@@ -111,9 +115,14 @@ public with sharing class MergedReportController {
             }
             
         } catch (Exception e) {
+            // Always log full error details server-side for debugging
+            System.debug(LoggingLevel.ERROR, 'Error processing reports: ' + e.getMessage() + '\n' + e.getStackTraceString());
+            
+            // Return user-friendly error message (with optional stack trace for debugging)
+            String errorMessage = formatErrorMessage(e);
             result.errors.add(new MergedGridDTO.ReportError(
                 null,
-                'Error processing reports: ' + e.getMessage() + ' - ' + e.getStackTraceString(),
+                errorMessage,
                 true
             ));
         }
@@ -1564,6 +1573,37 @@ public with sharing class MergedReportController {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    /**
+     * @description Formats error messages for client display
+     * Returns user-friendly messages by default, with optional stack traces for debugging
+     * @param e The exception to format
+     * @return Formatted error message string
+     */
+    private static String formatErrorMessage(Exception e) {
+        String userMessage = 'An error occurred while processing reports. Please try again or contact your administrator.';
+        
+        // Provide specific messages for common error types
+        if (e instanceof System.NoAccessException) {
+            userMessage = 'You don\'t have access to one or more reports.';
+        } else if (e.getMessage() != null) {
+            String msg = e.getMessage();
+            if (msg.contains('insufficient access')) {
+                userMessage = 'You don\'t have access to run one or more reports.';
+            } else if (msg.contains('limit') || msg.contains('LIMIT')) {
+                userMessage = 'A system limit was reached. Please try again later or reduce the number of reports.';
+            } else if (msg.contains('timeout') || msg.contains('TIMEOUT')) {
+                userMessage = 'The request timed out. Please try again or reduce the number of reports.';
+            }
+        }
+        
+        // Optionally append stack trace for debugging (controlled by INCLUDE_STACK_TRACES_IN_ERRORS flag)
+        if (INCLUDE_STACK_TRACES_IN_ERRORS) {
+            userMessage += ' - ' + e.getStackTraceString();
+        }
+        
+        return userMessage;
     }
     
     private static String formatValue(Decimal value, String dataType) {
