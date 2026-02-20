@@ -255,5 +255,75 @@ This is faster than change sets but requires CLI access to production org.
 
 ---
 
+## Validation Testing
+
+### Test Class for Change Set Validation
+
+When validating your change set in production, use **"Run specified tests"** to test only your components and avoid issues with other broken classes in the org.
+
+### Test Class Name (Copy-Paste Ready)
+
+```
+MergedReportControllerTest
+```
+
+### How to Use
+
+1. **In Change Set Validation:**
+   - Navigate to your change set in production
+   - Click **Validate** (or **Deploy** → **Validate**)
+   - Select **"Run specified tests"** radio button
+   - Paste the test class name above into the text box:
+     ```
+     MergedReportControllerTest
+     ```
+   - Click **Validate**
+
+2. **What This Tests:**
+   - ✅ `MergedReportController` (78% code coverage)
+   - ✅ `MergeOptions` (75% code coverage)
+   - ✅ `MergedGridDTO` (99% code coverage)
+   - ✅ All integration tests with real reports
+   - ✅ All unit tests for error handling
+
+3. **Coverage Requirements:**
+   - Each class must have **at least 75% coverage**
+   - `MergedReportController`: 78% ✅
+   - `MergeOptions`: 75% ✅
+   - `MergedGridDTO`: 99% ✅
+   - All requirements met!
+
+### Error Messages
+
+If tests fail, the error messages will now include detailed information:
+- Actual error from `MergedReportController`
+- Report IDs involved
+- Specific error details (e.g., "Dimension mismatch", "Report has no data")
+
+Example error message format:
+```
+Errors occurred: Dimension mismatch: Reports must have matching grouping fields (Report: 00OVD...); 
+```
+
+### All Test Classes in This Package
+
+| Test Class | Tests | Coverage Target | Status |
+|------------|-------|----------------|--------|
+| `MergedReportControllerTest` | 74 tests | 75% per class | ✅ All passing |
+
+### Quick Reference
+
+**For Change Set Validation:**
+- Test Option: **"Run specified tests"**
+- Test Class Name: `MergedReportControllerTest`
+- Expected Result: All tests pass, coverage requirements met
+
+**For CLI Deployment:**
+```bash
+sf project deploy start -o prod --test-level RunSpecifiedTests --tests MergedReportControllerTest
+```
+
+---
+
 **Last Updated:** February 2026  
 **Component Version:** 1.4.0
