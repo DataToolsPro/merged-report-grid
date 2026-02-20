@@ -89,10 +89,10 @@ When adding to your change set, search for this in the **Lightning Components** 
 1. Click **Add** in the change set
 2. Select component type: **Apex Classes**
 3. Add each of these (one at a time or select multiple):
-   - ✅ `MergedReportController`
-   - ✅ `MergedReportControllerTest`
-   - ✅ `MergeOptions`
-   - ✅ `MergedGridDTO`
+   - ✅ `MergedReportController` - Main controller class for merging reports
+   - ✅ `MergedReportControllerTest` - Test class with **dynamic report name lookup** (no hardcoded IDs)
+   - ✅ `MergeOptions` - Options class for merge configuration
+   - ✅ `MergedGridDTO` - Data transfer object for merged report data
 
 #### Add Lightning Component (1 total)
 
