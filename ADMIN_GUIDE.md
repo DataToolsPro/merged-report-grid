@@ -2,7 +2,7 @@
 
 A Lightning Web Component that merges 2-5 Salesforce reports into a single unified grid.
 
-**Version:** 1.4.0
+**Version:** 1.5.0
 
 ---
 
@@ -16,6 +16,7 @@ A Lightning Web Component that merges 2-5 Salesforce reports into a single unifi
    - [Dimension Constants](#dimension-constants-json)
    - [Column Aliases](#column-aliases-json)
    - [Calculated Fields](#calculated-fields-json)
+   - [Tier Lookups](#tier-lookups-json)
 6. [Working with Different Dimensions](#working-with-different-dimensions)
 7. [Viewing Source Reports](#viewing-source-reports)
 8. [Troubleshooting](#troubleshooting)
@@ -254,6 +255,7 @@ To show data specific to the viewing user:
 |----------|-------------|
 | **Column Aliases (JSON)** | Rename columns for display |
 | **Calculated Fields (JSON)** | Add formula columns |
+| **Tier Lookups (JSON)** | Tier-based rate lookups (usable in formulas) |
 
 ### Debug & Development
 
@@ -268,7 +270,7 @@ To show data specific to the viewing user:
 
 ### OUTER_JOIN (Default)
 
-Combines reports **horizontally**. All keys from all reports are included. Missing values show as `—` or `0`.
+Combines reports **horizontally**. All keys from all reports are included. Each report keeps its **own columns**—if both have "Sum of Amount", you get `r1_Sum_of_Amount` and `r2_Sum_of_Amount` as separate columns (shown as "Sum of Amount" and "Sum of Amount (2)"). Missing values show as `—` or `0`.
 
 **Use when:** You want to compare the same entities across different reports side-by-side.
 
@@ -299,7 +301,7 @@ Result:
 
 ### UNION
 
-Stacks reports **vertically**. Supports up to 2 grouping dimensions. Columns with matching names are merged.
+Stacks reports **vertically**. Supports up to 2 grouping dimensions. Columns with matching names are **merged** into a single column—values from all reports are stacked by row (e.g., "Sum of Amount" from Report 1 and "Sum of Amount" from Report 2 become one `merged_Sum_of_Amount` column).
 
 **Use when:** You want to stack different data sets with similar structure, or create grouped views with subtotals.
 
@@ -568,18 +570,28 @@ Output: `1234.56`
 **Exact Syntax:**
 ```json
 [
-  {"label": "COLUMN_NAME", "formula": "MATH_EXPRESSION"}
+  {"label": "COLUMN_NAME", "formula": "MATH_EXPRESSION", "format": "percent", "decimals": 1}
 ]
 ```
 
 **Rules:**
 - Must be a JSON **array** (starts with `[`, ends with `]`)
-- Each calculated field is an **object** with `label` and `formula`
+- Each calculated field is an **object** with required `label` and `formula`
 - `label` = the name shown in the column header
-- `formula` = math expression using existing column names
+- `formula` = math expression using existing column names (use display labels; if you alias a column, use the alias)
 - Column names in formulas must **exactly match** (use original names or aliases)
 - Supported operators: `+` `-` `*` `/`
+- Optional `format`, `decimals`, `currencyCode` control display
 - Multiple calculated fields are separated by commas
+
+**Optional format properties:**
+| Property | Values | Purpose |
+|----------|--------|---------|
+| `format` | `percent`, `currency`, `number`, `none` | How to display the value |
+| `decimals` | `1`, `2`, etc. | Decimal places (default 2) |
+| `currencyCode` | `USD`, `EUR`, etc. | When format is `currency` |
+
+**Percent format:** Use ratios 0–1 in your formula. Example: `Record Count / 100` gives 0.05 for 5 → displays as 5.0% with 1 decimal. Use `decimals: 1` for 4.3%, `decimals: 2` for 4.30%.
 
 **Examples:**
 
@@ -610,6 +622,20 @@ Output: `1234.56`
 ]
 ```
 
+*Percent format with explicit decimals:*
+```json
+[
+  {"label": "% Gone", "formula": "Record Count / Sum of Stage Duration", "format": "percent", "decimals": 1}
+]
+```
+
+*Shorthand for decimals (percent:1 = 1 decimal):*
+```json
+[
+  {"label": "Conversion Rate", "formula": "Won / Total", "format": "percent:1"}
+]
+```
+
 **Finding Column Names for Formulas:**
 1. Enable **Debug Mode** on the component
 2. Look at the "Columns & Data" section
@@ -631,10 +657,133 @@ Output: `1234.56`
 
 // ✅ CORRECT
 [{"label": "Rate", "formula": "Sum of Won / Record Count"}]
+
+// ✅ CORRECT - Percent with 1 decimal place
+[{"label": "% Gone", "formula": "Record Count / Sum of Stage Duration", "format": "percent", "decimals": 1}]
 ```
 
 **Division by Zero:**
 If a formula divides by a column that has 0 in some rows, those cells will show `—` (blank) instead of an error.
+
+**JOIN Mode: Duplicate Base Labels**
+
+In JOIN mode, when both reports have the same column (e.g., "Sum of Amount"), they appear as separate columns. When a formula uses the base label (e.g., "Sum of Amount" without a suffix), the component resolves it to the column with the **larger total**. That way ratio formulas like `Sum of Gross Margin / Sum of Funded Amount` use both values from the same report instead of mixing reports. (In UNION mode this doesn't apply—same-name columns are merged into one, so there's no ambiguity.)
+
+**Tier Lookups in Formulas:**
+Tier lookup columns are added *before* calculated fields, so you can reference them in formulas. Example: `Rate * Funded Amount` where "Rate" is a tier lookup column.
+
+---
+
+### Tier Lookups (JSON)
+
+**Property Name:** `Tier Lookups (JSON)`
+
+**What it does:** Creates columns with tier-based rate values instead of complex nested IF logic. Each tier lookup evaluates an input formula, then selects a value from a list of thresholds. The resulting column can be used in calculated fields (e.g., `Rate * Funded Amount`).
+
+**Why you need it:**
+- Commission rates that vary by conversion rate (e.g., 13% above 33.5%, 10% above 26.5%, 4% default)
+- Fee tiers based on ratios or percentages
+- Cleaner, maintainable configuration than nested IF formulas
+
+**Exact Syntax:**
+```json
+[
+  {
+    "label": "COLUMN_NAME",
+    "inputFormula": "FORMULA_FOR_INPUT",
+    "nullWhenZero": true,
+    "tiers": [
+      {"min": 0.335, "value": 0.13},
+      {"min": 0.265, "value": 0.10},
+      {"value": 0.04}
+    ],
+    "format": "percent:2",
+    "dataType": "PERCENT_DATA"
+  }
+]
+```
+
+**Rules:**
+- Must be a JSON **array**
+- Each object requires `label`, `inputFormula`, and `tiers`
+- `inputFormula` — math expression (same as calculated field formula); evaluated per row to get the input value
+- `tiers` — array of objects. Each object has:
+  - `min` (optional) — threshold; first tier where `input >= min` wins (tiers sorted by `min` descending)
+  - `value` — the value to use when this tier matches
+- The last tier typically has no `min` — it's the **default** used when no threshold matches
+- `nullWhenZero` (optional, default false) — if true, return null when input is 0 or null (e.g., when denominator is 0 in a ratio)
+- Optional `format`, `decimals`, `dataType` control display
+
+**Tier Logic:**
+1. Evaluate `inputFormula` for the row
+2. Sort tiers by `min` descending (highest first)
+3. Find the first tier where `input >= min`; use that tier's `value`
+4. If none match, use the default tier (the one with no `min`)
+
+**Examples:**
+
+*Commission rate by conversion:*
+```json
+[
+  {
+    "label": "Rate",
+    "inputFormula": "Funded / Approved",
+    "nullWhenZero": true,
+    "tiers": [
+      {"min": 0.335, "value": 0.13},
+      {"min": 0.265, "value": 0.10},
+      {"min": 0.225, "value": 0.08},
+      {"min": 0.20, "value": 0.07},
+      {"min": 0.17, "value": 0.06},
+      {"value": 0.04}
+    ],
+    "format": "percent:2",
+    "dataType": "PERCENT_DATA"
+  }
+]
+```
+
+*Using tier column in a calculated field (commission example):*
+
+Set **Tier Lookups (JSON)**:
+```json
+[
+  {
+    "label": "Rate",
+    "inputFormula": "Funded / Approved",
+    "nullWhenZero": true,
+    "tiers": [
+      {"min": 0.335, "value": 0.13},
+      {"min": 0.265, "value": 0.10},
+      {"min": 0.20, "value": 0.07},
+      {"value": 0.04}
+    ],
+    "format": "percent:2",
+    "dataType": "PERCENT_DATA"
+  }
+]
+```
+
+Set **Calculated Fields (JSON)**:
+```json
+[
+  {"label": "Commission", "formula": "Rate * Funded Amount"}
+]
+```
+
+The "Rate" tier column is added first, so the formula can reference it. For each row, `Funded / Approved` is evaluated, the matching tier value is selected, and "Commission" multiplies that Rate by Funded Amount.
+
+**Common Mistakes:**
+```json
+// ❌ WRONG - Missing label or inputFormula
+[{"inputFormula": "A/B", "tiers": [{"value": 0.1}]}]
+
+// ❌ WRONG - Empty tiers array
+[{"label": "Rate", "inputFormula": "A/B", "tiers": []}]
+
+// ✅ CORRECT - At least one tier with value, default last
+[{"label": "Rate", "inputFormula": "Funded/Approved", "nullWhenZero": true, "tiers": [{"min": 0.3, "value": 0.1}, {"value": 0.04}]}]
+```
 
 ---
 
@@ -804,5 +953,5 @@ For issues or feature requests, please open an issue in the repository.
 
 ---
 
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Last Updated:** February 2026

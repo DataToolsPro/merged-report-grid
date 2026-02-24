@@ -30,6 +30,7 @@ export default class MergedReportGrid extends LightningElement {
     // Column Configuration
     @api columnAliasesJson;
     @api calculatedFieldsJson;
+    @api tierLookupsJson;
     
     // Display Options
     @api missingValueAsZero = false;
@@ -229,6 +230,20 @@ export default class MergedReportGrid extends LightningElement {
             }
         }
         
+        let tierLookups = [];
+        if (this.tierLookupsJson) {
+            try {
+                const parsed = JSON.parse(this.tierLookupsJson);
+                if (Array.isArray(parsed)) {
+                    tierLookups = parsed;
+                } else {
+                    this.showToast('Warning', 'Tier Lookups should be a JSON array. Using empty array.', 'warning');
+                }
+            } catch (e) {
+                this.showToast('Warning', 'Invalid Tier Lookups JSON: ' + (e.message || 'Parse error') + '. Using empty array.', 'warning');
+            }
+        }
+        
         let dimensionConstants = {};
         if (this.dimensionConstantsJson) {
             const size = this.dimensionConstantsJson.length;
@@ -264,7 +279,8 @@ export default class MergedReportGrid extends LightningElement {
             fillMissingCategories: this.fillMissingCategories || false,
             dimensionConstants: dimensionConstants,
             columnAliases: columnAliases,
-            calculatedFields: calculatedFields
+            calculatedFields: calculatedFields,
+            tierLookups: tierLookups
         };
         
         // In App Builder design mode, add a cache buster to ensure fresh data on every call
@@ -299,6 +315,16 @@ export default class MergedReportGrid extends LightningElement {
             } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
         }
         
+        let tierLookups = [];
+        if (this.tierLookupsJson) {
+            try {
+                const parsed = JSON.parse(this.tierLookupsJson);
+                if (Array.isArray(parsed)) {
+                    tierLookups = parsed;
+                }
+            } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
+        }
+        
         let dimensionConstants = {};
         if (this.dimensionConstantsJson) {
             try { 
@@ -324,7 +350,8 @@ export default class MergedReportGrid extends LightningElement {
             fillMissingCategories: this.fillMissingCategories || false,
             dimensionConstants: dimensionConstants,
             columnAliases: columnAliases,
-            calculatedFields: calculatedFields
+            calculatedFields: calculatedFields,
+            tierLookups: tierLookups
         };
         
         return JSON.stringify(options);
@@ -555,6 +582,7 @@ export default class MergedReportGrid extends LightningElement {
             sortGroupsBy: this.sortGroupsBy || '(not set)',
             columnAliases: this.columnAliasesJson || '(not set)',
             calculatedFields: this.calculatedFieldsJson || '(not set)',
+            tierLookups: this.tierLookupsJson || '(not set)',
             missingValueAsZero: this.missingValueAsZero,
             sortBy: this.sortBy,
             sortDirection: this.sortDirection,
@@ -577,16 +605,21 @@ export default class MergedReportGrid extends LightningElement {
                         reportId: col.reportId || '(merged)',
                         columnKey: col.key,
                         columnLabel: col.label,
+                        originalLabelForAlias: col.aggregateLabel || col.originalLabel || col.label,
                         isMergedColumn: col.isMergedColumn
                     });
                 }
             });
         }
         
+        const keyCol = this.gridData.columns?.find(c => c.isKeyColumn);
+        const secondKeyCol = this.gridData.columns?.find(c => c.isSecondKeyColumn);
         return {
             columnCount: this.gridData.columns?.length || 0,
             rowCount: this.gridData.rows?.length || 0,
             hasSecondDimension: this.gridData.hasSecondDimension,
+            keyColumnLabel: keyCol?.label || '(none)',
+            secondKeyColumnLabel: secondKeyCol?.label || null,
             columns: reports
         };
     }
@@ -653,7 +686,50 @@ export default class MergedReportGrid extends LightningElement {
                 recs.push({
                     type: 'ERROR',
                     issue: 'Invalid Calculated Fields JSON',
-                    fix: 'Check JSON syntax'
+                    fix: e.message || 'Fix JSON syntax'
+                });
+            }
+        }
+        
+        if (this.tierLookupsJson) {
+            try {
+                const parsed = JSON.parse(this.tierLookupsJson);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((t, i) => {
+                        if (!t.label) {
+                            recs.push({
+                                type: 'ERROR',
+                                issue: `Tier lookup ${i + 1} missing label`,
+                                fix: 'Add "label" property to tier lookup'
+                            });
+                        }
+                        if (!t.inputFormula) {
+                            recs.push({
+                                type: 'ERROR',
+                                issue: `Tier lookup ${i + 1} missing inputFormula`,
+                                fix: 'Add "inputFormula" property'
+                            });
+                        }
+                        if (!Array.isArray(t.tiers) || t.tiers.length === 0) {
+                            recs.push({
+                                type: 'WARNING',
+                                issue: `Tier lookup "${t.label || i + 1}" has no tiers`,
+                                fix: 'Add "tiers" array with at least one {value} or {min, value}'
+                            });
+                        }
+                    });
+                } else {
+                    recs.push({
+                        type: 'ERROR',
+                        issue: 'Tier Lookups must be a JSON array',
+                        fix: 'Check JSON syntax'
+                    });
+                }
+            } catch (e) {
+                recs.push({
+                    type: 'ERROR',
+                    issue: 'Invalid Tier Lookups JSON',
+                    fix: e.message || 'Check JSON syntax'
                 });
             }
         }
@@ -661,6 +737,11 @@ export default class MergedReportGrid extends LightningElement {
         if (this.columnAliasesJson) {
             try {
                 JSON.parse(this.columnAliasesJson);
+                recs.push({
+                    type: 'INFO',
+                    issue: 'Column Aliases configured',
+                    fix: 'Keys must exactly match originalLabelForAlias in Columns & Data (spaces, underscores matter)'
+                });
             } catch (e) {
                 recs.push({
                     type: 'ERROR',

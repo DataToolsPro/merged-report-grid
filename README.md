@@ -4,7 +4,7 @@ A Salesforce Lightning Web Component that merges 2-5 Salesforce reports into a s
 
 ![Salesforce](https://img.shields.io/badge/Salesforce-00A1E0?style=flat&logo=salesforce&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 
 ## What Is This?
 
@@ -34,7 +34,8 @@ This repository contains everything you need to deploy the component to your Sal
 - **Vertical stacks** (UNION) - Stack rows with subtotals
 - **Dimension Constants** - Merge reports with different grouping levels
 - **Column Aliases with Custom Formatting** - Rename columns and override number formats (currency, percent, decimals)
-- **Calculated Fields** - Add formula columns
+- **Calculated Fields** - Add formula columns with optional format (percent, currency, decimals)
+- **Tier Lookups** - Tier-based rate lookups (e.g., commission rates) usable in calculated formulas
 - **Smart Caching** - Optimized for App Builder and runtime
 - **Change Set Compatible** - Can be deployed via change sets from sandbox to production
 

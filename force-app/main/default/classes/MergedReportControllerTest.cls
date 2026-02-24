@@ -26,6 +26,7 @@ private class MergedReportControllerTest {
         System.assertNotEquals(null, options.dimensionConstants, 'dimensionConstants not null');
         System.assertNotEquals(null, options.columnAliases, 'columnAliases not null');
         System.assertNotEquals(null, options.calculatedFields, 'calculatedFields not null');
+        System.assertNotEquals(null, options.tierLookups, 'tierLookups not null');
     }
     
     @IsTest
@@ -57,6 +58,7 @@ private class MergedReportControllerTest {
         options.dimensionConstants = null;
         options.columnAliases = null;
         options.calculatedFields = null;
+        options.tierLookups = null;
         
         List<String> warnings = options.validate();
         
@@ -68,6 +70,7 @@ private class MergedReportControllerTest {
         System.assertNotEquals(null, options.dimensionConstants);
         System.assertNotEquals(null, options.columnAliases);
         System.assertNotEquals(null, options.calculatedFields);
+        System.assertNotEquals(null, options.tierLookups);
     }
     
     @IsTest
@@ -356,6 +359,227 @@ private class MergedReportControllerTest {
         System.assertEquals('Difference', calcField.label);
         System.assertEquals('r1_RowCount - r2_RowCount', calcField.formula);
         System.assertEquals('DOUBLE_DATA', calcField.dataType);
+    }
+    
+    @IsTest
+    static void testCalculatedFieldWithFormatAndDecimals() {
+        MergeOptions.CalculatedField calcField = new MergeOptions.CalculatedField();
+        calcField.label = '% Gone';
+        calcField.formula = 'Record Count / Sum of Stage Duration';
+        calcField.format = 'percent';
+        calcField.decimals = 1;
+        calcField.currencyCode = null;
+        
+        System.assertEquals('percent', calcField.format);
+        System.assertEquals(1, calcField.decimals);
+    }
+    
+    // ========================================================================
+    // FORMULA EVALUATOR TESTS (evaluateFormula via @TestVisible)
+    // ========================================================================
+    
+    @IsTest
+    static void testFormulaSimpleDivision() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10, 'B' => 100 };
+        Decimal result = MergedReportController.evaluateFormula('A / B', values);
+        System.assertEquals(0.1, result, 'Simple division regression');
+    }
+    
+    @IsTest
+    static void testFormulaParenthesesAndMultiplication() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10, 'B' => 100 };
+        Decimal result = MergedReportController.evaluateFormula('(A / B) * 100', values);
+        System.assertEquals(10, result, '(10/100)*100 = 10');
+    }
+    
+    @IsTest
+    static void testFormulaOrderOfOperations() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 2, 'B' => 4, 'C' => 5 };
+        Decimal result = MergedReportController.evaluateFormula('A + B * C', values);
+        System.assertEquals(22, result, '2 + 4*5 = 22 (not 30)');
+    }
+    
+    @IsTest
+    static void testFormulaParenthesesWithSubtraction() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10, 'B' => 20, 'C' => 50 };
+        Decimal result = MergedReportController.evaluateFormula('(A - B) / C', values);
+        System.assertEquals(-0.2, result, '(10-20)/50 = -0.2');
+    }
+    
+    @IsTest
+    static void testFormulaNestedParentheses() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10, 'B' => 100 };
+        Decimal result = MergedReportController.evaluateFormula('((A) / B)', values);
+        System.assertEquals(0.1, result, 'Redundant parens');
+    }
+    
+    @IsTest
+    static void testFormulaDivideByZero() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10 };
+        Decimal result = MergedReportController.evaluateFormula('A / 0', values);
+        System.assertEquals(0, result, 'Divide by zero returns 0');
+    }
+    
+    @IsTest
+    static void testFormulaInvalidToken() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10 };
+        Decimal result = MergedReportController.evaluateFormula('A / NotAKey', values);
+        System.assertEquals(0, result, 'Unknown token in denominator treated as 0 (divide-by-zero behavior)');
+    }
+    
+    @IsTest
+    static void testFormulaSimpleAddition() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10, 'B' => 20 };
+        Decimal result = MergedReportController.evaluateFormula('A + B', values);
+        System.assertEquals(30, result, 'Simple addition');
+    }
+    
+    @IsTest
+    static void testFormulaSimpleSubtraction() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 100, 'B' => 30 };
+        Decimal result = MergedReportController.evaluateFormula('A - B', values);
+        System.assertEquals(70, result, 'Simple subtraction');
+    }
+    
+    @IsTest
+    static void testFormulaSimpleMultiplication() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 5, 'B' => 4 };
+        Decimal result = MergedReportController.evaluateFormula('A * B', values);
+        System.assertEquals(20, result, 'Simple multiplication');
+    }
+    
+    @IsTest
+    static void testFormulaPureToken() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'Amount' => 123.45 };
+        Decimal result = MergedReportController.evaluateFormula('Amount', values);
+        System.assertEquals(123.45, result, 'Pure token - column lookup');
+        result = MergedReportController.evaluateFormula('100', values);
+        System.assertEquals(100, result, 'Pure token - literal number');
+    }
+    
+    @IsTest
+    static void testFormulaNullInputs() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10 };
+        System.assertEquals(null, MergedReportController.evaluateFormula(null, values), 'Null formula');
+        System.assertEquals(null, MergedReportController.evaluateFormula('A + B', null), 'Null values');
+        System.assertEquals(null, MergedReportController.evaluateFormula('', values), 'Blank formula');
+    }
+    
+    @IsTest
+    static void testFormulaChainedSubtraction() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 100, 'B' => 20, 'C' => 10 };
+        Decimal result = MergedReportController.evaluateFormula('A - B - C', values);
+        // Splits on first -, so A - (B - C) = 100 - 10 = 90 (right-associative)
+        System.assertEquals(90, result, 'A - (B - C) = 90 when splitting on first -');
+    }
+    
+    @IsTest
+    static void testFormulaInvalidChars() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 10 };
+        Decimal result = MergedReportController.evaluateFormula('A @ B', values);
+        System.assertEquals(null, result, 'Invalid chars return null');
+    }
+    
+    // ========================================================================
+    // TIER LOOKUP TESTS (evaluateTierLookup via @TestVisible)
+    // ========================================================================
+    
+    @IsTest
+    static void testEvaluateTierLookupFirstMatch() {
+        // Tiers sorted by min descending (0.335, 0.265), then default
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        MergeOptions.TierEntry t1 = new MergeOptions.TierEntry(); t1.min = 0.335; t1.value = 0.13; tiers.add(t1);
+        MergeOptions.TierEntry t2 = new MergeOptions.TierEntry(); t2.min = 0.265; t2.value = 0.10; tiers.add(t2);
+        MergeOptions.TierEntry t3 = new MergeOptions.TierEntry(); t3.value = 0.04; tiers.add(t3);
+        
+        Decimal result = MergedReportController.evaluateTierLookup(0.40, tiers, false);
+        System.assertEquals(0.13, result, '0.40 >= 0.335 should use first tier');
+    }
+    
+    @IsTest
+    static void testEvaluateTierLookupSecondMatch() {
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        MergeOptions.TierEntry t1 = new MergeOptions.TierEntry(); t1.min = 0.335; t1.value = 0.13; tiers.add(t1);
+        MergeOptions.TierEntry t2 = new MergeOptions.TierEntry(); t2.min = 0.265; t2.value = 0.10; tiers.add(t2);
+        MergeOptions.TierEntry t3 = new MergeOptions.TierEntry(); t3.value = 0.04; tiers.add(t3);
+        
+        Decimal result = MergedReportController.evaluateTierLookup(0.30, tiers, false);
+        System.assertEquals(0.10, result, '0.30 >= 0.265 should use second tier');
+    }
+    
+    @IsTest
+    static void testEvaluateTierLookupDefaultTier() {
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        MergeOptions.TierEntry t1 = new MergeOptions.TierEntry(); t1.min = 0.335; t1.value = 0.13; tiers.add(t1);
+        MergeOptions.TierEntry t2 = new MergeOptions.TierEntry(); t2.value = 0.04; tiers.add(t2); // default
+        
+        Decimal result = MergedReportController.evaluateTierLookup(0.15, tiers, false);
+        System.assertEquals(0.04, result, '0.15 < all mins, should use default tier');
+    }
+    
+    @IsTest
+    static void testEvaluateTierLookupNullWhenZero() {
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        tiers.add(new MergeOptions.TierEntry()); tiers[0].value = 0.04;
+        
+        Decimal result = MergedReportController.evaluateTierLookup(0, tiers, true);
+        System.assertEquals(null, result, 'nullWhenZero with input 0 should return null');
+        
+        result = MergedReportController.evaluateTierLookup(null, tiers, true);
+        System.assertEquals(null, result, 'nullWhenZero with null input should return null');
+    }
+    
+    @IsTest
+    static void testEvaluateTierLookupNullWhenZeroFalse() {
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        tiers.add(new MergeOptions.TierEntry()); tiers[0].value = 0.04;
+        
+        Decimal result = MergedReportController.evaluateTierLookup(0, tiers, false);
+        System.assertEquals(0.04, result, 'nullWhenZero false with input 0 should use default');
+    }
+    
+    @IsTest
+    static void testEvaluateTierLookupEmptyTiers() {
+        List<MergeOptions.TierEntry> tiers = new List<MergeOptions.TierEntry>();
+        Decimal result = MergedReportController.evaluateTierLookup(0.5, tiers, false);
+        System.assertEquals(null, result, 'Empty tiers should return null');
+    }
+    
+    // ========================================================================
+    // FORMAT VALUE TESTS (formatValue via @TestVisible)
+    // ========================================================================
+    
+    @IsTest
+    static void testPercentFormattingMultipliesBy100() {
+        // Value 0.09587 (ratio) should display as 9.59%, not 0.10%
+        String result = MergedReportController.formatValue(0.09587, 'PERCENT_DATA', null, null, null);
+        System.assert(result.contains('9.59'), '0.09587 should format as 9.59%: ' + result);
+        System.assert(result.endsWith('%'), 'Should end with %: ' + result);
+    }
+    
+    @IsTest
+    static void testPercentFormattingHalf() {
+        String result = MergedReportController.formatValue(0.5, 'PERCENT_DATA', null, null, null);
+        System.assertEquals('50.00%', result, '0.5 should format as 50.00%');
+    }
+    
+    @IsTest
+    static void testFormatValuePercentOneDecimal() {
+        String result = MergedReportController.formatValue(0.043, 'DOUBLE_DATA', 'percent', 1, null);
+        System.assertEquals('4.3%', result, '0.043 with percent format and 1 decimal should display as 4.3%');
+    }
+    
+    @IsTest
+    static void testFormatValuePercentTwoDecimals() {
+        String result = MergedReportController.formatValue(0.043, 'DOUBLE_DATA', 'percent', 2, null);
+        System.assertEquals('4.30%', result, '0.043 with percent format and 2 decimals should display as 4.30%');
+    }
+    
+    @IsTest
+    static void testGetBaseLabelForDuplicateCheck() {
+        System.assertEquals('Sum of Gross Margin', MergedReportController.getBaseLabelForDuplicateCheck('Sum of Gross Margin (2)'));
+        System.assertEquals('Sum of Amount', MergedReportController.getBaseLabelForDuplicateCheck('Sum of Amount'));
+        System.assertEquals('Record Count', MergedReportController.getBaseLabelForDuplicateCheck('Record Count (3)'));
     }
     
     // ========================================================================
@@ -1208,6 +1432,56 @@ private class MergedReportControllerTest {
     }
     
     @IsTest(SeeAllData=true)
+    static void testIntegrationTierLookupsWithRealReports() {
+        List<Id> reportIds = requireReportsByNames(new List<String>{
+            REPORT_LEADS_BY_OWNER,
+            REPORT_LEADS_BY_STATUS
+        });
+        
+        List<Map<String, Object>> tierLookups = new List<Map<String, Object>>();
+        Map<String, Object> tl = new Map<String, Object>();
+        tl.put('label', 'Rate');
+        tl.put('inputFormula', 'r1_RowCount / r2_RowCount');
+        tl.put('nullWhenZero', true);
+        tl.put('tiers', new List<Map<String, Object>>{
+            new Map<String, Object>{ 'min' => 1.0, 'value' => 0.5 },
+            new Map<String, Object>{ 'min' => 0.5, 'value' => 0.25 },
+            new Map<String, Object>{ 'value' => 0.1 }
+        });
+        tl.put('dataType', 'PERCENT_DATA');
+        tl.put('format', 'percent:2');
+        tierLookups.add(tl);
+        
+        List<Map<String, Object>> calculatedFields = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'label' => 'Commission',
+                'formula' => 'Rate * r1_RowCount'
+            }
+        };
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'OUTER_JOIN',
+            'tierLookups' => tierLookups,
+            'calculatedFields' => calculatedFields
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+        System.assertNotEquals(null, result.columns);
+        Boolean hasRateCol = false;
+        Boolean hasCommissionCol = false;
+        for (MergedGridDTO.ColumnDefinition col : result.columns) {
+            if ('Rate'.equals(col.label)) hasRateCol = true;
+            if ('Commission'.equals(col.label)) hasCommissionCol = true;
+        }
+        System.assert(hasRateCol, 'Should have Rate tier lookup column');
+        System.assert(hasCommissionCol, 'Should have Commission calculated field column');
+    }
+    
+    @IsTest(SeeAllData=true)
     static void testIntegrationFormattingWithRealReports() {
         List<Id> reportIds = requireReportsByNames(new List<String>{
             REPORT_LEADS_BY_OWNER, 
@@ -1726,6 +2000,52 @@ private class MergedReportControllerTest {
             System.assertEquals(0, result.errors.size(), errorMsg);
         } else {
             System.assertEquals(0, result.errors.size(), 'Should have no errors');
+        }
+    }
+    
+    @IsTest(SeeAllData=true)
+    static void testIntegrationCalculatedFieldWithPercentFormat() {
+        List<Id> reportIds = requireReportsByNames(new List<String>{
+            REPORT_LEADS_BY_OWNER,
+            REPORT_LEADS_BY_OWNER_B
+        });
+        
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'OUTER_JOIN',
+            'calculatedFields' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => '% Rate',
+                    'formula' => 'r1_RowCount / 100',
+                    'format' => 'percent',
+                    'decimals' => 1
+                }
+            }
+        });
+        
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result);
+        System.assertNotEquals(null, result.columns);
+        if (result.errors.size() > 0) {
+            String errorMsg = 'Errors: ';
+            for (MergedGridDTO.ReportError err : result.errors) {
+                errorMsg += err.message + '; ';
+            }
+            System.assertEquals(0, result.errors.size(), errorMsg);
+        }
+        // Find the calculated column and verify it has percent format applied
+        MergedGridDTO.ColumnDefinition calcCol = null;
+        for (MergedGridDTO.ColumnDefinition c : result.columns) {
+            if (c.label == '% Rate') { calcCol = c; break; }
+        }
+        System.assertNotEquals(null, calcCol, 'Should have % Rate calculated column');
+        System.assertEquals('percent', calcCol.customFormat, 'Calculated column should have percent format');
+        System.assertEquals(1, calcCol.customDecimals, 'Calculated column should have 1 decimal');
+        if (!result.rows.isEmpty() && result.rows[0].formattedValues.containsKey(calcCol.key)) {
+            String formatted = result.rows[0].formattedValues.get(calcCol.key);
+            System.assert(formatted.endsWith('%'), 'Formatted value should end with %: ' + formatted);
         }
     }
     

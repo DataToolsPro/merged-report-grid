@@ -100,6 +100,11 @@ public with sharing class MergedReportController {
                 mergeJoin(parsedReports, options, result);
             }
             
+            // Add tier lookups (before calculated fields so formulas can reference them)
+            if (options.tierLookups != null && !options.tierLookups.isEmpty()) {
+                addTierLookups(options, result);
+            }
+            
             // Add calculated fields (works in both JOIN and UNION modes)
             if (options.calculatedFields != null && !options.calculatedFields.isEmpty()) {
                 addCalculatedFields(options, result);
@@ -1299,22 +1304,179 @@ public with sharing class MergedReportController {
     }
     
     /**
+     * @description Adds tier lookup columns and values (rate lookups based on input thresholds)
+     * Tier columns are added before calculated fields so formulas can reference them (e.g. Rate * Funded Amount)
+     */
+    private static void addTierLookups(MergeOptions options, MergedGridDTO result) {
+        Map<String, String> labelToKey = buildLabelToKeyForFormulas(result);
+        
+        for (MergeOptions.TierLookup tl : options.tierLookups) {
+            if (String.isBlank(tl.label) || String.isBlank(tl.inputFormula)) {
+                result.warnings.add('Tier lookup skipped: label and inputFormula are required.');
+                continue;
+            }
+            
+            String resolvedInput = resolveFormulaLabels(tl.inputFormula, labelToKey, result);
+            if (resolvedInput == null) {
+                continue;
+            }
+            
+            MergedGridDTO.ColumnDefinition col = new MergedGridDTO.ColumnDefinition();
+            col.key = 'tier_' + sanitizeKey(tl.label);
+            col.label = tl.label;
+            col.dataType = (tl.dataType != null) ? tl.dataType : 'DOUBLE_DATA';
+            col.isKeyColumn = false;
+            parseAndApplyTierLookupFormat(tl, col);
+            result.columns.add(col);
+            
+            List<MergeOptions.TierEntry> sortedTiers = sortTiersForLookup(tl.tiers);
+            
+            for (MergedGridDTO.GridRow row : result.rows) {
+                if (row.isSubtotalRow) continue;
+                Decimal inputVal = evaluateFormula(resolvedInput, row.values);
+                Decimal tierVal = evaluateTierLookup(inputVal, sortedTiers, tl.nullWhenZero);
+                row.values.put(col.key, tierVal);
+                row.formattedValues.put(col.key, formatValue(tierVal, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
+            }
+            
+            for (MergedGridDTO.GridRow row : result.rows) {
+                if (row.isSubtotalRow) {
+                    Decimal inputVal = evaluateFormula(resolvedInput, row.values);
+                    Decimal tierVal = evaluateTierLookup(inputVal, sortedTiers, tl.nullWhenZero);
+                    row.values.put(col.key, tierVal);
+                    row.formattedValues.put(col.key, formatValue(tierVal, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
+                }
+            }
+            
+            if (result.totalsRow != null) {
+                Decimal inputVal = evaluateFormula(resolvedInput, result.totalsRow.values);
+                Decimal tierVal = evaluateTierLookup(inputVal, sortedTiers, tl.nullWhenZero);
+                result.totalsRow.values.put(col.key, tierVal);
+                result.totalsRow.formattedValues.put(col.key, formatValue(tierVal, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
+            }
+            
+            labelToKey.put(col.label, col.key);
+            labelToKey.put(col.key, col.key);
+        }
+    }
+    
+    /**
+     * @description Sorts tiers by min descending; default tier (no min) last
+     */
+    private static List<MergeOptions.TierEntry> sortTiersForLookup(List<MergeOptions.TierEntry> tiers) {
+        if (tiers == null || tiers.isEmpty()) return new List<MergeOptions.TierEntry>();
+        List<MergeOptions.TierEntry> withMin = new List<MergeOptions.TierEntry>();
+        List<MergeOptions.TierEntry> defaults = new List<MergeOptions.TierEntry>();
+        for (MergeOptions.TierEntry t : tiers) {
+            if (t == null) continue;
+            if (t.min != null) {
+                withMin.add(t);
+            } else {
+                defaults.add(t);
+            }
+        }
+        withMin.sort(new TierMinDescComparator());
+        List<MergeOptions.TierEntry> result = new List<MergeOptions.TierEntry>();
+        result.addAll(withMin);
+        result.addAll(defaults);
+        return result;
+    }
+    
+    private class TierMinDescComparator implements Comparator<MergeOptions.TierEntry> {
+        public Integer compare(MergeOptions.TierEntry a, MergeOptions.TierEntry b) {
+            Decimal am = a != null ? a.min : null;
+            Decimal bm = b != null ? b.min : null;
+            if (am == null && bm == null) return 0;
+            if (am == null) return 1;
+            if (bm == null) return -1;
+            return am < bm ? 1 : (am > bm ? -1 : 0);
+        }
+    }
+    
+    /**
+     * @description Evaluates tier lookup: first tier where input >= min wins; fallback to default (no min)
+     * @TestVisible for unit testing
+     */
+    @TestVisible
+    private static Decimal evaluateTierLookup(Decimal inputVal, List<MergeOptions.TierEntry> sortedTiers, Boolean nullWhenZero) {
+        if (nullWhenZero == Boolean.TRUE && (inputVal == null || inputVal == 0)) {
+            return null;
+        }
+        if (inputVal == null) inputVal = 0;
+        for (MergeOptions.TierEntry t : sortedTiers) {
+            if (t == null || t.value == null) continue;
+            if (t.min == null) {
+                return t.value;
+            }
+            if (inputVal >= t.min) {
+                return t.value;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * @description Applies format/decimals from TierLookup to column definition
+     */
+    private static void parseAndApplyTierLookupFormat(MergeOptions.TierLookup tl, MergedGridDTO.ColumnDefinition col) {
+        if (String.isBlank(tl.format)) return;
+        String formatStr = tl.format.trim().toLowerCase();
+        col.customFormat = formatStr;
+        col.customDecimals = (tl.decimals != null) ? tl.decimals : 2;
+        col.customCurrencyCode = null;
+        if (formatStr.contains(':')) {
+            List<String> parts = formatStr.split(':');
+            col.customFormat = parts[0].toLowerCase();
+            if (col.customFormat == 'currency' && parts.size() > 1) {
+                col.customCurrencyCode = parts[1].toUpperCase();
+            } else if ((col.customFormat == 'percent' || col.customFormat == 'number') && parts.size() > 1) {
+                try {
+                    col.customDecimals = Integer.valueOf(parts[1]);
+                } catch (Exception e) {
+                    col.customDecimals = 2;
+                }
+            }
+        }
+    }
+    
+    /**
+     * @description Builds label-to-key map for formula resolution (used by tier lookups and calculated fields)
+     */
+    private static Map<String, String> buildLabelToKeyForFormulas(MergedGridDTO result) {
+        Map<String, Decimal> totalByKey = (result.totalsRow != null && result.totalsRow.values != null)
+            ? result.totalsRow.values : new Map<String, Decimal>();
+        Map<String, String> baseLabelToBestKey = new Map<String, String>();
+        for (MergedGridDTO.ColumnDefinition existingCol : result.columns) {
+            if (existingCol.isKeyColumn || existingCol.isSecondKeyColumn || String.isBlank(existingCol.label)) continue;
+            String baseLabel = getBaseLabelForDuplicateCheck(existingCol.label);
+            Decimal total = totalByKey.get(existingCol.key);
+            Decimal totalAbs = (total != null) ? total.abs() : Decimal.valueOf(0);
+            String bestKey = baseLabelToBestKey.get(baseLabel);
+            Decimal bestTotal = (bestKey != null && totalByKey.containsKey(bestKey)) ? totalByKey.get(bestKey).abs() : Decimal.valueOf(0);
+            if (bestKey == null || totalAbs > bestTotal) {
+                baseLabelToBestKey.put(baseLabel, existingCol.key);
+            }
+        }
+        Map<String, String> labelToKey = new Map<String, String>();
+        for (MergedGridDTO.ColumnDefinition existingCol : result.columns) {
+            if (!existingCol.isKeyColumn && !existingCol.isSecondKeyColumn) {
+                if (String.isNotBlank(existingCol.label)) {
+                    labelToKey.put(existingCol.label, existingCol.key);
+                    String baseLabel = getBaseLabelForDuplicateCheck(existingCol.label);
+                    labelToKey.put(baseLabel, baseLabelToBestKey.get(baseLabel));
+                }
+                labelToKey.put(existingCol.key, existingCol.key);
+            }
+        }
+        return labelToKey;
+    }
+    
+    /**
      * @description Adds calculated field columns and values
      * Supports both internal keys (r1_Sum_of_Amount) and display labels (Sum of Amount)
      */
     private static void addCalculatedFields(MergeOptions options, MergedGridDTO result) {
-        // Build map of display label -> internal key for formula resolution
-        Map<String, String> labelToKey = new Map<String, String>();
-        for (MergedGridDTO.ColumnDefinition existingCol : result.columns) {
-            if (!existingCol.isKeyColumn && !existingCol.isSecondKeyColumn) {
-                // Map by display label (for user-friendly formulas)
-                if (String.isNotBlank(existingCol.label)) {
-                    labelToKey.put(existingCol.label, existingCol.key);
-                }
-                // Also map by internal key (for technical formulas)
-                labelToKey.put(existingCol.key, existingCol.key);
-            }
-        }
+        Map<String, String> labelToKey = buildLabelToKeyForFormulas(result);
         
         for (MergeOptions.CalculatedField calcField : options.calculatedFields) {
             if (String.isBlank(calcField.label) || String.isBlank(calcField.formula)) {
@@ -1334,6 +1496,8 @@ public with sharing class MergedReportController {
             col.label = calcField.label;
             col.dataType = calcField.dataType != null ? calcField.dataType : 'DOUBLE_DATA';
             col.isKeyColumn = false;
+            // Apply format, decimals, currency from calculated field
+            parseAndApplyCalculatedFieldFormat(calcField, col);
             result.columns.add(col);
             
             Decimal totalCalcValue = 0;
@@ -1364,6 +1528,48 @@ public with sharing class MergedReportController {
                 Decimal totalsCalcValue = evaluateFormula(resolvedFormula, result.totalsRow.values);
                 result.totalsRow.values.put(col.key, totalsCalcValue);
                 result.totalsRow.formattedValues.put(col.key, formatValue(totalsCalcValue, col.dataType, col.customFormat, col.customDecimals, col.customCurrencyCode));
+            }
+        }
+    }
+    
+    /**
+     * @description Returns base label for duplicate-check (strips " (2)", " (3)" suffix)
+     * @TestVisible for unit testing
+     */
+    @TestVisible
+    private static String getBaseLabelForDuplicateCheck(String label) {
+        if (String.isBlank(label)) return label;
+        Integer parenIdx = label.lastIndexOf(' (');
+        if (parenIdx > 0 && label.endsWith(')') && label.length() > parenIdx + 3) {
+            String suffix = label.substring(parenIdx);
+            if (Pattern.matches(' \\(\\d+\\)', suffix)) {
+                return label.substring(0, parenIdx).trim();
+            }
+        }
+        return label.trim();
+    }
+    
+    /**
+     * @description Parses format/decimals/currencyCode from CalculatedField and applies to column
+     * Supports shorthand: percent:1, currency:EUR
+     */
+    private static void parseAndApplyCalculatedFieldFormat(MergeOptions.CalculatedField calcField, MergedGridDTO.ColumnDefinition col) {
+        if (String.isBlank(calcField.format)) return;
+        String formatStr = calcField.format.trim().toLowerCase();
+        col.customFormat = formatStr;
+        col.customDecimals = calcField.decimals != null ? calcField.decimals : 2;
+        col.customCurrencyCode = String.isNotBlank(calcField.currencyCode) ? calcField.currencyCode : null;
+        if (formatStr.contains(':')) {
+            List<String> parts = formatStr.split(':');
+            col.customFormat = parts[0].toLowerCase();
+            if (col.customFormat == 'currency' && parts.size() > 1) {
+                col.customCurrencyCode = parts[1].toUpperCase();
+            } else if ((col.customFormat == 'percent' || col.customFormat == 'number') && parts.size() > 1) {
+                try {
+                    col.customDecimals = Integer.valueOf(parts[1]);
+                } catch (Exception e) {
+                    col.customDecimals = 2;
+                }
             }
         }
     }
@@ -1442,69 +1648,122 @@ public with sharing class MergedReportController {
     }
     
     /**
-     * @description Evaluates a simple formula
-     * Validates formula safety before evaluation
+     * @description Evaluates a formula with support for parentheses and order of operations.
+     * Supports + - * / with proper precedence; parentheses override precedence.
+     * @TestVisible for unit testing formula logic in isolation
      */
+    @TestVisible
     private static Decimal evaluateFormula(String formula, Map<String, Decimal> values) {
         if (String.isBlank(formula) || values == null) return null;
         
         try {
             formula = formula.trim();
             
-            // Additional safety check: ensure formula only contains valid characters
-            // This is a defense-in-depth measure (already validated in resolveFormulaLabels)
+            // Safety: only allow valid formula characters
             if (!Pattern.matches('^[a-zA-Z0-9_() +\\-*/\\s]+$', formula)) {
                 return null;
             }
             
-            if (formula.contains(' + ')) {
-                List<String> parts = formula.split(' \\+ ');
-                Decimal result = 0;
-                for (String part : parts) {
-                    Decimal val = getValueForToken(part.trim(), values);
-                    if (val != null) result += val; // Treat null as 0
-                }
-                return result;
+            // Strip outer parentheses if the whole expression is wrapped
+            formula = stripOuterParentheses(formula);
+            
+            // Find first operator at depth 0 (lowest precedence first for correct order of ops)
+            OperatorMatch addSub = findFirstOperatorAtDepth(formula, new List<String>{' + ', ' - '});
+            if (addSub != null) {
+                String left = formula.substring(0, addSub.idx).trim();
+                String right = formula.substring(addSub.idx + addSub.op.length()).trim();
+                Decimal leftVal = getValueOrEvaluate(left, values);
+                Decimal rightVal = getValueOrEvaluate(right, values);
+                if (leftVal == null) leftVal = 0;
+                if (rightVal == null) rightVal = 0;
+                return addSub.op.contains('+') ? leftVal + rightVal : leftVal - rightVal;
             }
             
-            if (formula.contains(' - ')) {
-                List<String> parts = formula.split(' - ');
-                Decimal result = getValueForToken(parts[0].trim(), values);
-                if (result == null) result = 0; // Treat null as 0
-                for (Integer i = 1; i < parts.size(); i++) {
-                    Decimal val = getValueForToken(parts[i].trim(), values);
-                    if (val != null) result -= val; // Treat null as 0
+            OperatorMatch mulDiv = findFirstOperatorAtDepth(formula, new List<String>{' * ', ' / '});
+            if (mulDiv != null) {
+                String left = formula.substring(0, mulDiv.idx).trim();
+                String right = formula.substring(mulDiv.idx + mulDiv.op.length()).trim();
+                Decimal leftVal = getValueOrEvaluate(left, values);
+                Decimal rightVal = getValueOrEvaluate(right, values);
+                if (mulDiv.op.contains('*')) {
+                    if (leftVal == null) leftVal = 0;
+                    if (rightVal == null) rightVal = 0;
+                    return leftVal * rightVal;
+                } else {
+                    if (leftVal == null) return 0;
+                    if (rightVal == null || rightVal == 0) return 0; // Divide by zero
+                    return leftVal.divide(rightVal, 4, RoundingMode.HALF_UP);
                 }
-                return result;
-            }
-            
-            if (formula.contains(' * ')) {
-                List<String> parts = formula.split(' \\* ');
-                Decimal result = 1;
-                for (String part : parts) {
-                    Decimal val = getValueForToken(part.trim(), values);
-                    if (val == null) val = 0; // Treat null as 0
-                    result *= val;
-                }
-                return result;
-            }
-            
-            if (formula.contains(' / ')) {
-                List<String> parts = formula.split(' / ');
-                Decimal result = getValueForToken(parts[0].trim(), values);
-                if (result == null) return 0; // Treat null as 0
-                for (Integer i = 1; i < parts.size(); i++) {
-                    Decimal val = getValueForToken(parts[i].trim(), values);
-                    if (val == null || val == 0) return 0; // Divide by zero = 0
-                    result = result.divide(val, 4, RoundingMode.HALF_UP);
-                }
-                return result;
             }
             
             return getValueForToken(formula, values);
             
         } catch (Exception e) {
             return null;
+        }
+    }
+    
+    /**
+     * @description Strips outer parentheses if the entire expression is wrapped in matching ( )
+     */
+    private static String stripOuterParentheses(String formula) {
+        if (formula.length() < 2 || formula.substring(0, 1) != '(') return formula;
+        Integer depth = 1;
+        for (Integer i = 1; i < formula.length(); i++) {
+            String c = formula.substring(i, i + 1);
+            if (c == '(') depth++;
+            else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    if (i == formula.length() - 1) {
+                        return formula.substring(1, formula.length() - 1).trim();
+                    }
+                    return formula;
+                }
+            }
+        }
+        return formula;
+    }
+    
+    /**
+     * @description Finds the first occurrence of any operator at parenthesis depth 0
+     */
+    private static OperatorMatch findFirstOperatorAtDepth(String formula, List<String> operators) {
+        Integer depth = 0;
+        Integer len = formula.length();
+        for (Integer i = 0; i < len; i++) {
+            String c = formula.substring(i, i + 1);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            if (depth == 0) {
+                for (String op : operators) {
+                    if (i + op.length() <= len && formula.substring(i, i + op.length()) == op) {
+                        return new OperatorMatch(i, op);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * @description Tries token lookup first; if not a simple token, recurses with evaluateFormula
+     */
+    private static Decimal getValueOrEvaluate(String part, Map<String, Decimal> values) {
+        Decimal val = getValueForToken(part, values);
+        if (val != null) return val;
+        return evaluateFormula(part, values);
+    }
+    
+    /**
+     * @description Holds operator position and literal for formula parsing
+     */
+    private class OperatorMatch {
+        public Integer idx;
+        public String op;
+        public OperatorMatch(Integer idx, String op) {
+            this.idx = idx;
+            this.op = op;
         }
     }
     
@@ -1617,7 +1876,9 @@ public with sharing class MergedReportController {
      * @param customFormat Custom format override (currency, percent, number, none)
      * @param customDecimals Custom decimal places
      * @param customCurrencyCode Custom currency code (e.g., EUR, GBP)
+     * @TestVisible for unit testing percent/currency formatting
      */
+    @TestVisible
     private static String formatValue(Decimal value, String dataType, String customFormat, Integer customDecimals, String customCurrencyCode) {
         if (value == null) return '—';
         
@@ -1659,9 +1920,9 @@ public with sharing class MergedReportController {
             return isNegative ? '-' + currencySymbol + formatted : currencySymbol + formatted;
         }
         
-        // Percentage formatting with % symbol
+        // Percentage formatting with % symbol (value in 0-1 scale, display as 0-100)
         if (effectiveFormat == 'percent') {
-            return formatWithCommas(value.setScale(decimals, RoundingMode.HALF_UP), decimals) + '%';
+            return formatWithCommas((value * 100).setScale(decimals, RoundingMode.HALF_UP), decimals) + '%';
         }
         
         // Number formatting with thousand separators

@@ -50,6 +50,8 @@
                       description="Rename columns. Format: {&quot;Record Count&quot;:&quot;Total&quot;, &quot;Sum of Amount (2)&quot;:&quot;Revenue&quot;}"/>
             <property name="calculatedFieldsJson" type="String" label="Calculated Fields (JSON)"
                       description="Add computed columns (JOIN mode only). Format: [{&quot;label&quot;:&quot;Diff&quot;,&quot;formula&quot;:&quot;r1_RowCount - r2_RowCount&quot;}]"/>
+            <property name="tierLookupsJson" type="String" label="Tier Lookups (JSON)"
+                      description="Tier-based rate lookups (usable in formulas). Format: [{&quot;label&quot;:&quot;Rate&quot;,&quot;inputFormula&quot;:&quot;Funded / Approved&quot;,&quot;nullWhenZero&quot;:true,&quot;tiers&quot;:[{&quot;min&quot;:0.335,&quot;value&quot;:0.13},{&quot;value&quot;:0.04}]}]"/>
             
             <!-- Display Options -->
             <property name="missingValueAsZero" type="Boolean" label="Show Missing as Zero" default="false"

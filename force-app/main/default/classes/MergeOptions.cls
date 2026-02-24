@@ -86,6 +86,33 @@ public class MergeOptions {
     @AuraEnabled public List<CalculatedField> calculatedFields { get; set; }
     
     /**
+     * @description Tier lookups - rate lookups based on input formula thresholds
+     * Format: [{ "label": "Rate", "inputFormula": "Funded/Approved", "nullWhenZero": true, "tiers": [{"min":0.335,"value":0.13},{"value":0.04}] }]
+     */
+    @AuraEnabled public List<TierLookup> tierLookups { get; set; }
+    
+    /**
+     * @description Tier lookup definition - produces a column usable in formulas
+     */
+    public class TierLookup {
+        @AuraEnabled public String label { get; set; }
+        @AuraEnabled public String inputFormula { get; set; }
+        @AuraEnabled public Boolean nullWhenZero { get; set; }
+        @AuraEnabled public List<TierEntry> tiers { get; set; }
+        @AuraEnabled public String format { get; set; }
+        @AuraEnabled public Integer decimals { get; set; }
+        @AuraEnabled public String dataType { get; set; }
+    }
+    
+    /**
+     * @description Single tier threshold - min (optional) and value
+     */
+    public class TierEntry {
+        @AuraEnabled public Decimal min { get; set; }
+        @AuraEnabled public Decimal value { get; set; }
+    }
+    
+    /**
      * @description Column configuration (parsed from columnAliases)
      */
     public class ColumnConfig {
@@ -120,11 +147,18 @@ public class MergeOptions {
     
     /**
      * @description Calculated field definition
+     * Optional format, decimals, and currencyCode control display (e.g. percent, currency)
      */
     public class CalculatedField {
         @AuraEnabled public String label { get; set; }
         @AuraEnabled public String formula { get; set; }
         @AuraEnabled public String dataType { get; set; }
+        /** Format: percent, currency, number, none. Shorthand: percent:1, currency:EUR */
+        @AuraEnabled public String format { get; set; }
+        /** Decimal places for display (default 2). Use 1 for 4.3%, 2 for 4.30% */
+        @AuraEnabled public Integer decimals { get; set; }
+        /** Currency code when format=currency (e.g. USD, EUR) */
+        @AuraEnabled public String currencyCode { get; set; }
         
         public CalculatedField() {
             this.dataType = 'DOUBLE_DATA';
@@ -149,6 +183,7 @@ public class MergeOptions {
         this.dimensionConstants = new Map<String, String>();
         this.columnAliases = new Map<String, Object>();
         this.calculatedFields = new List<CalculatedField>();
+        this.tierLookups = new List<TierLookup>();
     }
     
     /**
@@ -234,6 +269,9 @@ public class MergeOptions {
         }
         if (this.calculatedFields == null) {
             this.calculatedFields = new List<CalculatedField>();
+        }
+        if (this.tierLookups == null) {
+            this.tierLookups = new List<TierLookup>();
         }
         
         return warnings;
