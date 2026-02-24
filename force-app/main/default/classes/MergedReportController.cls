@@ -1399,7 +1399,7 @@ public with sharing class MergedReportController {
      */
     @TestVisible
     private static Decimal evaluateTierLookup(Decimal inputVal, List<MergeOptions.TierEntry> sortedTiers, Boolean nullWhenZero) {
-        if (nullWhenZero == Boolean.TRUE && (inputVal == null || inputVal == 0)) {
+        if (nullWhenZero == true && (inputVal == null || inputVal == 0)) {
             return null;
         }
         if (inputVal == null) inputVal = 0;
