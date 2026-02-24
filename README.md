@@ -39,6 +39,10 @@ This repository contains everything you need to deploy the component to your Sal
 - **Smart Caching** - Optimized for App Builder and runtime
 - **Change Set Compatible** - Can be deployed via change sets from sandbox to production
 
+## Deployment Policy
+
+**Never deploy to production.** Deploy to **cardiff--datatools** sandbox (alias: `sandbox`) for QA. Production is deployed by the user via change sets. See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
+
 ## Quick Start for Salesforce Admins
 
 ### Prerequisites
@@ -53,12 +57,8 @@ REM 1. Clone or download this repository
 git clone <repository-url>
 cd merged-report-grid
 
-REM 2. Authenticate to your Salesforce org
-REM For Sandbox:
+REM 2. Authenticate to sandbox (NEVER target production)
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
-
-REM For Production:
-sf org login web -a MyProd --instance-url https://login.salesforce.com
 
 REM 3. Deploy to your org
 sf project deploy start -o MySandbox
@@ -74,12 +74,8 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 git clone <repository-url>
 cd merged-report-grid
 
-# 2. Authenticate to your Salesforce org
-# For Sandbox:
+# 2. Authenticate to sandbox (NEVER target production)
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
-
-# For Production:
-sf org login web -a MyProd --instance-url https://login.salesforce.com
 
 # 3. Deploy to your org
 sf project deploy start -o MySandbox
@@ -90,7 +86,7 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 
 ### Can This Be Deployed via Change Sets?
 
-**Yes!** This component can be deployed to a sandbox first, then moved to production using change sets. This is the traditional Salesforce deployment method.
+**Yes!** Deploy to sandbox first, then the user moves to production using change sets. **Never deploy to production via CLI.** See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
 
 **Steps:**
 1. Deploy to sandbox using the CLI commands above
@@ -105,6 +101,7 @@ See the [ADMIN_GUIDE.md](ADMIN_GUIDE.md) for detailed change set instructions.
 
 | Document | Audience | Contents |
 |----------|----------|----------|
+| **[DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md)** | All | **Never deploy to production.** Sandbox only; production via change sets. |
 | **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | Salesforce Admins | Complete installation guide, deployment options (CLI & change sets), configuration, usage, troubleshooting |
 | **README.md** (this file) | Everyone | Overview, what's included, quick start, project structure |
 

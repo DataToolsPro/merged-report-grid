@@ -1,8 +1,14 @@
 # Change Set Deployment Inventory
 
 **Component:** Merged Report Grid Lightning Web Component  
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Date:** February 2026
+
+---
+
+## Deployment Policy
+
+**Never deploy to production.** Deploy to **cardiff--datatools** sandbox (alias: `sandbox`) for QA. Production deployment is performed by the user (change sets, etc.). See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
 
 ---
 
@@ -79,7 +85,7 @@ When adding to your change set, search for this in the **Lightning Components** 
 
 1. Navigate to **Setup → Outbound Change Sets**
 2. Click **New**
-3. Name: `Merged Report Grid v1.4.0` (or your preferred name)
+3. Name: `Merged Report Grid v1.5.0` (or your preferred name)
 4. Description: `Merged Report Grid LWC - Merges 2-5 Salesforce reports into unified grid`
 
 ### Step 2: Add Components
@@ -117,7 +123,7 @@ When adding to your change set, search for this in the **Lightning Components** 
 ### Step 4: Deploy to Production
 
 1. In your **Production** org, navigate to **Setup → Inbound Change Sets**
-2. Find your change set: `Merged Report Grid v1.4.0`
+2. Find your change set: `Merged Report Grid v1.5.0`
 3. Click **Deploy**
 4. Review the components list
 5. Click **Deploy**
@@ -239,19 +245,19 @@ After deployment, verify:
 
 ---
 
-## Alternative: Direct CLI Deployment
+## Alternative: Direct CLI Deployment (Sandbox Only)
 
-If you prefer to skip change sets, you can deploy directly to production via CLI:
+**Do not deploy to production via CLI.** For sandbox deployment:
 
 ```bash
-# Deploy to production with tests
-sf project deploy start -o prod --test-level RunSpecifiedTests --tests MergedReportControllerTest
+# Deploy to sandbox
+sf project deploy start -o sandbox --test-level NoTestRun
 
-# Verify deployment
-sf project deploy report -o prod
+# Or with tests
+sf project deploy start -o sandbox --test-level RunSpecifiedTests --tests MergedReportControllerTest
 ```
 
-This is faster than change sets but requires CLI access to production org.
+Production must use change sets. See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
 
 ---
 
@@ -318,9 +324,9 @@ Errors occurred: Dimension mismatch: Reports must have matching grouping fields 
 - Test Class Name: `MergedReportControllerTest`
 - Expected Result: All tests pass, coverage requirements met
 
-**For CLI Deployment:**
+**For CLI Deployment (sandbox only, never production):**
 ```bash
-sf project deploy start -o prod --test-level RunSpecifiedTests --tests MergedReportControllerTest
+sf project deploy start -o sandbox --test-level RunSpecifiedTests --tests MergedReportControllerTest
 ```
 
 ---

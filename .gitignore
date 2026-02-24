@@ -97,3 +97,31 @@ destructive/
 # Don't commit test data files that may contain real data
 **/testdata/
 **/*-testdata.json
+
+# ==================================
+# Agentic / AI Workflow
+# ==================================
+# Agent transcripts and conversation history
+agent-transcripts/
+
+# MCP server configs (local paths, project-specific)
+mcps/
+
+# Cursor project settings (local dev config)
+.cursor/
+
+# Test run artifacts (generated during development)
+test-results/
+test-results.json
+
+# Internal bug/enhancement tracking (not part of public deliverable)
+BUGS.md
+
+# ==================================
+# Client-Specific
+# ==================================
+# Client/org-specific configuration
+config/client-*.json
+**/*-client.json
+**/org-specific/
+.clients/

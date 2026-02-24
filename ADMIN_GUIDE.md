@@ -38,9 +38,13 @@ This guide provides deployment instructions for deploying the component directly
 sf --version
 ```
 
-### Method 1: Deploy via Salesforce CLI (Recommended)
+### Deployment Policy
 
-This is the fastest method for deploying to a sandbox or production org.
+**Never deploy to production from automation or CLI.** Deploy to **cardiff--datatools** sandbox (alias: `sandbox`) for QA. Production deployment is performed by the user via change sets. See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
+
+### Method 1: Deploy via Salesforce CLI (Sandbox)
+
+Deploy to your sandbox org.
 
 #### Windows (CMD/PowerShell)
 
@@ -49,12 +53,8 @@ REM 1. Clone the repository (or download and extract the ZIP)
 git clone <repository-url>
 cd merged-report-grid
 
-REM 2. Authenticate to your org
-REM For Sandbox:
+REM 2. Authenticate to sandbox (NEVER target production)
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
-
-REM For Production:
-sf org login web -a MyProd --instance-url https://login.salesforce.com
 
 REM 3. Deploy the code
 sf project deploy start -o MySandbox
@@ -70,14 +70,10 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 git clone <repository-url>
 cd merged-report-grid
 
-# 2. Authenticate to your org
-# For Sandbox:
+# 2. Authenticate to sandbox (NEVER target production)
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
 
-# For Production:
-sf org login web -a MyProd --instance-url https://login.salesforce.com
-
-# 3. Deploy the code
+# 3. Deploy the code (sandbox only)
 sf project deploy start -o MySandbox
 
 # 4. (Optional) Run tests to verify
@@ -91,28 +87,17 @@ sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 git clone <repository-url>
 cd merged-report-grid
 
-# 2. Authenticate to your org
-# For Sandbox:
+# 2. Authenticate to sandbox (NEVER target production)
 sf org login web -a MySandbox --instance-url https://test.salesforce.com
 
-# For Production:
-sf org login web -a MyProd --instance-url https://login.salesforce.com
-
-# 3. Deploy the code
+# 3. Deploy the code (sandbox only)
 sf project deploy start -o MySandbox
 
 # 4. (Optional) Run tests to verify
 sf apex run test -n MergedReportControllerTest -o MySandbox -r human -w 5
 ```
 
-**For Production (Direct Deploy):**
-```bash
-# Production requires passing Apex tests
-sf project deploy start -o MyProd --test-level RunSpecifiedTests --tests MergedReportControllerTest
-
-# Verify deployment
-sf project deploy report -o MyProd
-```
+**Production:** Do not deploy to production via CLI. Use change sets (Method 2). See [DEPLOYMENT_POLICY.md](DEPLOYMENT_POLICY.md).
 
 ### Method 2: Deploy via Change Sets (Sandbox to Production)
 
