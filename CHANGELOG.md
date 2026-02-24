@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Tests** – Unit tests for `evaluateTierLookup`; integration test for tier lookups with calculated fields.
 
+### Fixed
+
+- **Column Aliases** – Aliases were not applied because Apex `JSON.deserialize` does not populate `Map<String, Object>` in class properties. Now manually extracts `columnAliases` via `JSON.deserializeUntyped`. Also added trimmed-label fallback in `getColumnConfig` for robustness.
+
 ### Changed
 
 - **Formula Resolution** – Extracted `buildLabelToKeyForFormulas()` for reuse by tier lookups and calculated fields.
@@ -33,8 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 | File | Changes |
 |------|---------|
-| `MergeOptions.cls` | Added `tierLookups`, `TierLookup`, `TierEntry` |
-| `MergedReportController.cls` | Added `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()` |
+| `MergeOptions.cls` | Added `tierLookups`, `TierLookup`, `TierEntry`; `getColumnConfig()` trim fallback |
+| `MergedReportController.cls` | Added `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()`, `extractColumnAliasesFromJson()` |
 | `mergedReportGrid.js` | Added `tierLookupsJson` property, parsing, validation |
 | `mergedReportGrid.js-meta.xml` | Added Tier Lookups (JSON) property |
 | `MergedReportControllerTest.cls` | Added tier lookup unit and integration tests |

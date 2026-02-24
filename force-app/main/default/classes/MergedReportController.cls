@@ -137,7 +137,9 @@ public with sharing class MergedReportController {
     }
     
     /**
-     * @description Parses the options JSON string
+     * @description Parses the options JSON string.
+     * Manually extracts columnAliases because Apex JSON.deserialize does not reliably
+     * populate Map<String, Object> in class properties.
      */
     private static MergeOptions parseOptions(String optionsJson) {
         if (String.isBlank(optionsJson)) {
@@ -145,9 +147,30 @@ public with sharing class MergedReportController {
         }
         try {
             MergeOptions options = (MergeOptions) JSON.deserialize(optionsJson, MergeOptions.class);
+            // Manually extract columnAliases - JSON.deserialize often fails to populate Map<String, Object>
+            extractColumnAliasesFromJson(optionsJson, options);
             return options;
         } catch (Exception e) {
             return new MergeOptions();
+        }
+    }
+    
+    /**
+     * @description Extracts columnAliases from raw JSON and sets on options.
+     * Required because Apex JSON.deserialize does not properly populate Map<String, Object> properties.
+     */
+    private static void extractColumnAliasesFromJson(String optionsJson, MergeOptions options) {
+        try {
+            Object root = JSON.deserializeUntyped(optionsJson);
+            if (!(root instanceof Map<String, Object>)) return;
+            Map<String, Object> rootMap = (Map<String, Object>) root;
+            Object colObj = rootMap.get('columnAliases');
+            if (colObj == null) return;
+            if (colObj instanceof Map<String, Object>) {
+                options.columnAliases = (Map<String, Object>) colObj;
+            }
+        } catch (Exception e) {
+            // Ignore - use whatever columnAliases the class deserializer produced (possibly null/empty)
         }
     }
     

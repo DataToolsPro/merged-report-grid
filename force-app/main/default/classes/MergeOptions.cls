@@ -299,14 +299,27 @@ public class MergeOptions {
     
     /**
      * @description Gets the full column configuration for a label
-     * Parses both simple string format and extended object format
+     * Parses both simple string format and extended object format.
+     * Tries exact match first, then trimmed match (handles whitespace differences from Reports API).
      */
     public ColumnConfig getColumnConfig(String originalLabel) {
-        if (this.columnAliases == null || !this.columnAliases.containsKey(originalLabel)) {
+        if (this.columnAliases == null || this.columnAliases.isEmpty()) {
             return null;
         }
         
         Object configValue = this.columnAliases.get(originalLabel);
+        if (configValue == null && String.isNotBlank(originalLabel)) {
+            String trimmed = originalLabel.trim();
+            for (String key : this.columnAliases.keySet()) {
+                if (key != null && key.trim().equals(trimmed)) {
+                    configValue = this.columnAliases.get(key);
+                    break;
+                }
+            }
+        }
+        if (configValue == null) {
+            return null;
+        }
         ColumnConfig config = new ColumnConfig();
         
         // Simple string format: { "Column": "Alias" }
