@@ -34,6 +34,7 @@ lightning-card {
 .totals-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .totals-cell {
@@ -42,13 +43,22 @@ lightning-card {
     vertical-align: middle;
 }
 
+/* Match lightning-datatable column widths for alignment */
 .totals-cell.row-number-cell {
-    width: 3.75rem;
-    min-width: 3.75rem;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    max-width: 2.5rem;
 }
 
 .totals-cell.key-cell {
-    width: 200px;
+    width: 180px;
+    min-width: 180px;
+    text-align: left;
+}
+
+.totals-cell.second-key-cell {
+    width: 140px;
+    min-width: 140px;
     text-align: left;
 }
 

@@ -556,6 +556,10 @@ export default class MergedReportGrid extends LightningElement {
         return this.showGrandTotalRow !== false && this.totalsRow;
     }
     
+    get hasSecondDimension() {
+        return this.gridData?.hasSecondDimension === true;
+    }
+    
     // ===== Debug Mode Properties =====
     get isDebugMode() {
         return this.debugMode === true;

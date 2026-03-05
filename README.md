@@ -4,7 +4,7 @@ A Salesforce Lightning Web Component that merges 2-5 Salesforce reports into a s
 
 ![Salesforce](https://img.shields.io/badge/Salesforce-00A1E0?style=flat&logo=salesforce&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.3-blue)
 
 ## What Is This?
 
@@ -272,7 +272,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Version:** 1.4.0  
+**Version:** 1.5.3  
 **API Version:** 59.0
 
 ---

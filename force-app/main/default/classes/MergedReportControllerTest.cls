@@ -1433,19 +1433,21 @@ private class MergedReportControllerTest {
     
     @IsTest(SeeAllData=true)
     static void testIntegrationTierLookupsWithRealReports() {
+        // Use two reports with same grouping (Owner) so JOIN works; both have Record Count (merged)
         List<Id> reportIds = requireReportsByNames(new List<String>{
             REPORT_LEADS_BY_OWNER,
-            REPORT_LEADS_BY_STATUS
+            REPORT_LEADS_BY_OWNER_B
         });
         
+        // inputFormula must reference columns that exist: merged "Record Count" (not r1_RowCount/r2_RowCount)
         List<Map<String, Object>> tierLookups = new List<Map<String, Object>>();
         Map<String, Object> tl = new Map<String, Object>();
         tl.put('label', 'Rate');
-        tl.put('inputFormula', 'r1_RowCount / r2_RowCount');
+        tl.put('inputFormula', 'Record Count');
         tl.put('nullWhenZero', true);
         tl.put('tiers', new List<Map<String, Object>>{
-            new Map<String, Object>{ 'min' => 1.0, 'value' => 0.5 },
-            new Map<String, Object>{ 'min' => 0.5, 'value' => 0.25 },
+            new Map<String, Object>{ 'min' => 10.0, 'value' => 0.5 },
+            new Map<String, Object>{ 'min' => 5.0, 'value' => 0.25 },
             new Map<String, Object>{ 'value' => 0.1 }
         });
         tl.put('dataType', 'PERCENT_DATA');
@@ -1455,7 +1457,7 @@ private class MergedReportControllerTest {
         List<Map<String, Object>> calculatedFields = new List<Map<String, Object>>{
             new Map<String, Object>{
                 'label' => 'Commission',
-                'formula' => 'Rate * r1_RowCount'
+                'formula' => 'Rate * Record Count'
             }
         };
         

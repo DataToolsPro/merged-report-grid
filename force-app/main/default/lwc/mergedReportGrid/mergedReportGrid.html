@@ -232,16 +232,19 @@
                         show-row-number-column
                     ></lightning-datatable>
                     
-                    <!-- Totals Row -->
+                    <!-- Totals Row (column count and widths match lightning-datatable for alignment) -->
                     <template lwc:if={showTotalsRow}>
                         <div class="totals-row slds-border_top slds-p-vertical_x-small">
-                            <table class="slds-table totals-table">
+                            <table class="slds-table totals-table" role="presentation">
                                 <tbody>
                                     <tr>
                                         <td class="totals-cell row-number-cell"></td>
                                         <td class="totals-cell key-cell">
                                             <strong>Total</strong>
                                         </td>
+                                        <template lwc:if={hasSecondDimension}>
+                                            <td class="totals-cell second-key-cell"></td>
+                                        </template>
                                         <template for:each={valueColumns} for:item="col">
                                             <td key={col.key} class="totals-cell value-cell">
                                                 <strong>{col.totalValue}</strong>

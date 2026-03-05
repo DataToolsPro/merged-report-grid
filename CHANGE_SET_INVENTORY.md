@@ -1,7 +1,7 @@
 # Change Set Deployment Inventory
 
 **Component:** Merged Report Grid Lightning Web Component  
-**Version:** 1.5.0  
+**Version:** 1.5.3  
 **Date:** February 2026
 
 ---
@@ -123,7 +123,7 @@ When adding to your change set, search for this in the **Lightning Components** 
 ### Step 4: Deploy to Production
 
 1. In your **Production** org, navigate to **Setup → Inbound Change Sets**
-2. Find your change set: `Merged Report Grid v1.5.0`
+2. Find your change set: `Merged Report Grid v1.5.3`
 3. Click **Deploy**
 4. Review the components list
 5. Click **Deploy**
@@ -332,4 +332,4 @@ sf project deploy start -o sandbox --test-level RunSpecifiedTests --tests Merged
 ---
 
 **Last Updated:** February 2026  
-**Component Version:** 1.4.0
+**Component Version:** 1.5.3

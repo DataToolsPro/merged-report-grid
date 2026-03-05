@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.5.3] - 2026-02-24
+
+### Fixed
+
+- **Totals row alignment** – Totals row is a separate table below the datatable; column count and widths now match. Added missing second key column when `hasSecondDimension` is true (UNION with 2 dimensions). Set row-number to 2.5rem, key to 180px, second key to 140px to align with lightning-datatable.
+- **Integration test** – `testIntegrationTierLookupsWithRealReports` used `r1_RowCount / r2_RowCount` and REPORT_LEADS_BY_OWNER + REPORT_LEADS_BY_STATUS; in JOIN mode both reports merge "Record Count" so those keys don't exist. Test now uses REPORT_LEADS_BY_OWNER + REPORT_LEADS_BY_OWNER_B and `inputFormula: "Record Count"`, formula `Rate * Record Count`.
+
+### Changed
+
+- **LWC** – `mergedReportGrid.html` totals row includes optional second key cell; `mergedReportGrid.css` totals column widths aligned to datatable; `mergedReportGrid.js` adds `hasSecondDimension` getter.
+
+---
+
 ## [1.5.0] - 2026-02-24
 
 ### Added
@@ -58,5 +71,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+[1.5.3]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.5.3
 [1.5.0]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.5.0
 [1.4.0]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.4.0
