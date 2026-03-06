@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.5.4] - 2026-02-24
+
+### Fixed
+
+- **Column Aliases (client-side fallback)** – Aliases now apply in the LWC when building displayed columns, so they work even when Apex does not receive them (e.g., property timing, cache). Supports label-based (`{"Sum of X": "X"}`), index-based (`{"2": "Alias"}`), and extended format (`{"X": {"label": "Y"}}`).
+
+---
+
 ## [1.5.3] - 2026-02-24
 
 ### Fixed
@@ -38,7 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- **Column Aliases** – Aliases were not applied because Apex `JSON.deserialize` does not populate `Map<String, Object>` in class properties. Now manually extracts `columnAliases` via `JSON.deserializeUntyped`. Also added trimmed-label fallback in `getColumnConfig` for robustness.
+- **Column Aliases** – Aliases were not applied because Apex `JSON.deserialize` fails on `Map<String, Object>` in class properties. `parseOptions` now uses `JSON.deserializeUntyped` to manually populate all options (columnAliases, calculatedFields, tierLookups). Also added trimmed-label fallback in `getColumnConfig` for robustness.
 
 ### Changed
 
@@ -51,7 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 | File | Changes |
 |------|---------|
 | `MergeOptions.cls` | Added `tierLookups`, `TierLookup`, `TierEntry`; `getColumnConfig()` trim fallback |
-| `MergedReportController.cls` | Added `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()`, `extractColumnAliasesFromJson()` |
+| `MergedReportController.cls` | Added `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()`; `parseOptions()` uses `JSON.deserializeUntyped` for all options |
 | `mergedReportGrid.js` | Added `tierLookupsJson` property, parsing, validation |
 | `mergedReportGrid.js-meta.xml` | Added Tier Lookups (JSON) property |
 | `MergedReportControllerTest.cls` | Added tier lookup unit and integration tests |

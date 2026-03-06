@@ -47,7 +47,7 @@
             
             <!-- Column Configuration -->
             <property name="columnAliasesJson" type="String" label="Column Aliases (JSON)"
-                      description="Rename columns. Format: {&quot;Record Count&quot;:&quot;Total&quot;, &quot;Sum of Amount (2)&quot;:&quot;Revenue&quot;}"/>
+                      description="Rename columns (applied client-side). By label: {&quot;Sum of Funded Amount&quot;:&quot;Funded Amount&quot;}. By index: {&quot;2&quot;:&quot;Alias&quot;} for column 2."/>
             <property name="calculatedFieldsJson" type="String" label="Calculated Fields (JSON)"
                       description="Add computed columns (JOIN mode only). Format: [{&quot;label&quot;:&quot;Diff&quot;,&quot;formula&quot;:&quot;r1_RowCount - r2_RowCount&quot;}]"/>
             <property name="tierLookupsJson" type="String" label="Tier Lookups (JSON)"
@@ -56,9 +56,8 @@
             <!-- Display Options -->
             <property name="missingValueAsZero" type="Boolean" label="Show Missing as Zero" default="false"
                       description="Display missing values as 0 instead of —"/>
-            <property name="sortBy" type="String" label="Sort By" default="KEY"
-                      datasource="KEY,REPORT1_VALUE,REPORT2_VALUE,REPORT3_VALUE,REPORT4_VALUE,REPORT5_VALUE"
-                      description="Initial sort column"/>
+            <property name="sortBy" type="String" label="Sort By Column Index" default="0"
+                      description="Column index for initial sort: 0=key, 1+=value columns. Use Debug Mode to see column order. Click header to sort at runtime."/>
             <property name="sortDirection" type="String" label="Sort Direction" default="ASC"
                       datasource="ASC,DESC"/>
             <property name="maxRows" type="Integer" label="Maximum Rows" default="200" min="1" max="2000"/>

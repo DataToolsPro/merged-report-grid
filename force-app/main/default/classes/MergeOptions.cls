@@ -230,11 +230,9 @@ public class MergeOptions {
             }
         }
         
-        // Normalize sort by
+        // Normalize sort by (no uppercasing - sortBy can be a column key like calc_Fund_%)
         if (String.isBlank(this.sortBy)) {
             this.sortBy = SORT_BY_KEY;
-        } else {
-            this.sortBy = this.sortBy.toUpperCase();
         }
         
         // Normalize max rows
@@ -300,7 +298,7 @@ public class MergeOptions {
     /**
      * @description Gets the full column configuration for a label
      * Parses both simple string format and extended object format.
-     * Tries exact match first, then trimmed match (handles whitespace differences from Reports API).
+     * Tries: 1) exact match, 2) trimmed match (whitespace), 3) case-insensitive match.
      */
     public ColumnConfig getColumnConfig(String originalLabel) {
         if (this.columnAliases == null || this.columnAliases.isEmpty()) {
@@ -310,10 +308,21 @@ public class MergeOptions {
         Object configValue = this.columnAliases.get(originalLabel);
         if (configValue == null && String.isNotBlank(originalLabel)) {
             String trimmed = originalLabel.trim();
+            // Try trimmed match
             for (String key : this.columnAliases.keySet()) {
                 if (key != null && key.trim().equals(trimmed)) {
                     configValue = this.columnAliases.get(key);
                     break;
+                }
+            }
+            // Fallback: case-insensitive match (handles Reports API casing differences)
+            if (configValue == null) {
+                String lowerOriginal = trimmed.toLowerCase();
+                for (String key : this.columnAliases.keySet()) {
+                    if (key != null && key.trim().toLowerCase().equals(lowerOriginal)) {
+                        configValue = this.columnAliases.get(key);
+                        break;
+                    }
                 }
             }
         }
@@ -366,7 +375,6 @@ public class MergeOptions {
             
             return config;
         }
-        
         return null;
     }
     

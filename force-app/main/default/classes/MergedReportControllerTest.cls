@@ -1505,6 +1505,22 @@ private class MergedReportControllerTest {
     }
     
     @IsTest(SeeAllData=true)
+    static void testIntegrationColumnAliasesFromRawJson() {
+        // Exercises parseOptions with columnAliases in options JSON (LWC sends this)
+        List<Id> reportIds = requireReportsByNames(new List<String>{
+            REPORT_LEADS_BY_OWNER,
+            REPORT_LEADS_BY_OWNER_B
+        });
+        String optionsJson = '{"mergeMode":"OUTER_JOIN","columnAliases":{"Record Count":"Count"},"calculatedFields":[],"tierLookups":[],"dimensionConstants":{}}';
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        System.assertNotEquals(null, result);
+        System.assertNotEquals(null, result.columns);
+        System.assert(result.errors.isEmpty(), 'Should not error with columnAliases in options JSON');
+    }
+    
+    @IsTest(SeeAllData=true)
     static void testIntegrationSingleReportError() {
         List<Id> reportIds = requireReportsByNames(new List<String>{
             REPORT_LEADS_BY_OWNER

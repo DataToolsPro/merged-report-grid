@@ -68,6 +68,12 @@ public class MergedGridDTO {
      */
     @AuraEnabled public String secondDimensionLabel { get; set; }
     
+    /**
+     * @description Debug: keys received in columnAliases (to verify Apex parsed them).
+     * Populated when column aliases are configured. Empty = none received.
+     */
+    @AuraEnabled public List<String> columnAliasKeysReceived { get; set; }
+    
     public MergedGridDTO() {
         this.columns = new List<ColumnDefinition>();
         this.rows = new List<GridRow>();
@@ -102,8 +108,8 @@ public class MergedGridDTO {
         @AuraEnabled public String customFormat { get; set; }
         @AuraEnabled public Integer customDecimals { get; set; }
         @AuraEnabled public String customCurrencyCode { get; set; }
-        // Original label before alias (for format lookup)
-        public String originalLabel { get; set; }
+        /** Original label from report (for LWC alias lookup and formula resolution) */
+        @AuraEnabled public String originalLabel { get; set; }
         
         public ColumnDefinition() {
             this.isKeyColumn = false;

@@ -218,7 +218,7 @@ To show data specific to the viewing user:
 | Property | Default | Description |
 |----------|---------|-------------|
 | **Show Missing as Zero** | `false` | Display `0` instead of `—` for missing values |
-| **Sort By** | `KEY` | Initial sort column |
+| **Sort By Column Index** | `0` | Column index for initial sort: 0=key, 1+=value columns. Use Debug Mode to see column order. |
 | **Sort Direction** | `ASC` | `ASC` or `DESC` |
 | **Maximum Rows** | `200` | Row limit (max 2000) |
 | **Show Grand Total** | `true` | Display totals row at bottom |

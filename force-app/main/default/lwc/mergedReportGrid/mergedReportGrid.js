@@ -34,7 +34,7 @@ export default class MergedReportGrid extends LightningElement {
     
     // Display Options
     @api missingValueAsZero = false;
-    @api sortBy = 'KEY';
+    @api sortBy = '0';  // Column index: 0=key, 1+=value columns
     @api sortDirection = SORT_DIRECTION_ASC;
     @api maxRows = 200;
     @api showGrandTotalRow;
@@ -182,6 +182,92 @@ export default class MergedReportGrid extends LightningElement {
         return ids;
     }
     
+    /**
+     * Resolves display label from column alias config.
+     * Tries all column identifiers in priority order, strips dedup suffixes,
+     * and supports index-based aliasing for every column type (including calc/tier).
+     * @param {Object} col - column definition from Apex
+     * @param {number} index - 0-based column index
+     * @param {Object} aliasMap - pre-parsed alias map (avoids re-parsing per column)
+     */
+    _getDisplayLabel(col, index, aliasMap) {
+        if (!aliasMap || Object.keys(aliasMap).length === 0) return null;
+
+        const candidates = [
+            col.originalLabel,
+            col.aggregateLabel,
+            col.label
+        ].filter(Boolean);
+
+        let val;
+
+        // 1. Exact match against any candidate identifier
+        for (const candidate of candidates) {
+            val = aliasMap[candidate];
+            if (val !== undefined) break;
+        }
+
+        // 2. Case-insensitive match
+        if (val === undefined) {
+            for (const candidate of candidates) {
+                const lower = candidate.trim().toLowerCase();
+                for (const k of Object.keys(aliasMap)) {
+                    if (k && k.trim().toLowerCase() === lower) {
+                        val = aliasMap[k];
+                        break;
+                    }
+                }
+                if (val !== undefined) break;
+            }
+        }
+
+        // 3. Base-label match: strip JOIN dedup suffix like " (2)" and retry
+        if (val === undefined) {
+            for (const candidate of candidates) {
+                const base = candidate.replace(/\s*\(\d+\)\s*$/, '').trim();
+                if (base !== candidate) {
+                    val = aliasMap[base];
+                    if (val === undefined) {
+                        const baseLower = base.toLowerCase();
+                        for (const k of Object.keys(aliasMap)) {
+                            if (k && k.trim().toLowerCase() === baseLower) {
+                                val = aliasMap[k];
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (val !== undefined) break;
+            }
+        }
+
+        // 4. Index-based alias (works for ALL column types including calc/tier)
+        if (val === undefined) val = aliasMap[String(index)];
+        if (val === undefined) val = aliasMap[index];
+
+        if (val == null) return null;
+        if (typeof val === 'string') return val;
+        if (typeof val === 'object' && val !== null && typeof val.label === 'string') return val.label;
+        return null;
+    }
+
+    // Parse column aliases JSON; tolerates trailing text after }. Returns object or null.
+    _tryParseColumnAliasesJson(str) {
+        if (!str || typeof str !== 'string') return null;
+        let jsonStr = str.trim();
+        try {
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            const lastBrace = jsonStr.lastIndexOf('}');
+            if (lastBrace > 0) {
+                try {
+                    return JSON.parse(jsonStr.substring(0, lastBrace + 1));
+                } catch (e2) { /* fall through */ }
+            }
+            return null;
+        }
+    }
+    
     _buildOptionsJson() {
         // JSON size warning thresholds (10KB is very generous - realistic max is ~5KB)
         // These are warnings for debugging, not hard limits
@@ -196,16 +282,13 @@ export default class MergedReportGrid extends LightningElement {
             } else if (size > JSON_SIZE_WARNING) {
                 this.showToast('Info', `Column Aliases JSON is large (${Math.round(size/1024)}KB). If you experience issues, consider reducing aliases.`, 'info');
             }
-            try { 
-                const parsed = JSON.parse(this.columnAliasesJson);
-                // Validate structure - must be an object, not array
-                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
-                    columnAliases = parsed;
-                } else {
-                    this.showToast('Warning', 'Column Aliases should be a JSON object (e.g., {"Column": "Alias"}). Using empty object.', 'warning');
-                }
-            } catch (e) {
-                this.showToast('Warning', 'Invalid Column Aliases JSON: ' + (e.message || 'Parse error') + '. Using empty object.', 'warning');
+            const parsed = this._tryParseColumnAliasesJson(this.columnAliasesJson);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                columnAliases = parsed;
+            } else if (parsed !== null) {
+                this.showToast('Warning', 'Column Aliases should be a JSON object (e.g., {"Column": "Alias"}). Using empty object.', 'warning');
+            } else {
+                this.showToast('Warning', 'Invalid Column Aliases JSON. Use only valid JSON, e.g. {"Record Count": "Count"}. Remove any trailing text. Using empty object.', 'warning');
             }
         }
         
@@ -269,7 +352,7 @@ export default class MergedReportGrid extends LightningElement {
             mergeMode: this.mergeMode || MERGE_MODE_OUTER_JOIN,
             dataVisibility: this.visibilityScope || 'ALL',
             missingValueAsZero: this.missingValueAsZero || false,
-            sortBy: this.currentSortBy || this.sortBy || 'KEY',
+            sortBy: String(this.currentSortBy ?? this.sortBy ?? 0),
             sortDirection: this.currentSortDirection || this.sortDirection || SORT_DIRECTION_ASC,
             sortGroupsBy: this.sortGroupsBy || null,
             maxRows: this.maxRows || 200,
@@ -295,15 +378,7 @@ export default class MergedReportGrid extends LightningElement {
     // Build options JSON WITHOUT cache buster - used for comparing if options changed
     // This prevents infinite loops in renderedCallback where Date.now() would always differ
     _buildStableOptionsJson() {
-        let columnAliases = {};
-        if (this.columnAliasesJson) {
-            try { 
-                const parsed = JSON.parse(this.columnAliasesJson);
-                if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
-                    columnAliases = parsed;
-                }
-            } catch (e) { /* ignore - will be caught in _buildOptionsJson */ }
-        }
+        let columnAliases = this._tryParseColumnAliasesJson(this.columnAliasesJson) || {};
         
         let calculatedFields = [];
         if (this.calculatedFieldsJson) {
@@ -340,7 +415,7 @@ export default class MergedReportGrid extends LightningElement {
             mergeMode: this.mergeMode || MERGE_MODE_OUTER_JOIN,
             dataVisibility: this.visibilityScope || 'ALL',
             missingValueAsZero: this.missingValueAsZero || false,
-            sortBy: this.currentSortBy || this.sortBy || 'KEY',
+            sortBy: String(this.currentSortBy ?? this.sortBy ?? 0),
             sortDirection: this.currentSortDirection || this.sortDirection || SORT_DIRECTION_ASC,
             sortGroupsBy: this.sortGroupsBy || null,
             maxRows: this.maxRows || 200,
@@ -489,12 +564,25 @@ export default class MergedReportGrid extends LightningElement {
         return cols;
     }
     
+    get sortedByFieldName() {
+        const sb = this.currentSortBy ?? this.sortBy ?? 0;
+        const cols = this.columns || [];
+        const idx = parseInt(sb, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < cols.length) {
+            const col = cols[idx];
+            return col.isKeyColumn ? 'keyLabel' : (col.isSecondKeyColumn ? 'secondKeyLabel' : col.key);
+        }
+        return (typeof sb === 'string' && sb) ? sb : 'keyLabel';
+    }
+
     get tableColumns() {
         if (!this.columns || this.columns.length === 0) return [];
-        
+
+        const aliasMap = this._tryParseColumnAliasesJson(this.columnAliasesJson) || {};
         return this.columns.map((col, index) => {
+            const displayLabel = this._getDisplayLabel(col, index, aliasMap) || col.label;
             const column = {
-                label: col.label,
+                label: displayLabel,
                 fieldName: col.isKeyColumn ? 'keyLabel' : (col.isSecondKeyColumn ? 'secondKeyLabel' : col.key),
                 sortable: !col.isSecondKeyColumn,
                 hideDefaultActions: true,
@@ -601,15 +689,19 @@ export default class MergedReportGrid extends LightningElement {
     get debugReports() {
         if (!this.gridData) return { status: 'No data received yet' };
         
+        const aliasMap = this._tryParseColumnAliasesJson(this.columnAliasesJson) || {};
         const reports = [];
         if (this.gridData.columns) {
-            this.gridData.columns.forEach(col => {
+            this.gridData.columns.forEach((col, idx) => {
                 if (!col.isKeyColumn && !col.isSecondKeyColumn) {
                     reports.push({
-                        reportId: col.reportId || '(merged)',
+                        columnIndex: idx,
+                        reportId: col.reportId || '(calculated/tier)',
                         columnKey: col.key,
                         columnLabel: col.label,
-                        originalLabelForAlias: col.aggregateLabel || col.originalLabel || col.label,
+                        originalLabel: col.originalLabel || '(not set)',
+                        aggregateLabel: col.aggregateLabel || '(not set)',
+                        resolvedAlias: this._getDisplayLabel(col, idx, aliasMap) || '(no match)',
                         isMergedColumn: col.isMergedColumn
                     });
                 }
@@ -618,8 +710,10 @@ export default class MergedReportGrid extends LightningElement {
         
         const keyCol = this.gridData.columns?.find(c => c.isKeyColumn);
         const secondKeyCol = this.gridData.columns?.find(c => c.isSecondKeyColumn);
+        const allColumnsWithIndex = this.gridData.columns?.map((c, i) => ({ index: i, label: c.label, key: c.key })) || [];
         return {
             columnCount: this.gridData.columns?.length || 0,
+            columnIndexForSortBy: allColumnsWithIndex,
             rowCount: this.gridData.rows?.length || 0,
             hasSecondDimension: this.gridData.hasSecondDimension,
             keyColumnLabel: keyCol?.label || '(none)',
@@ -637,7 +731,8 @@ export default class MergedReportGrid extends LightningElement {
             hasSecondDimension: this.gridData.hasSecondDimension,
             errors: this.gridData.errors,
             warnings: this.gridData.warnings,
-            keyOverlapPercentage: this.gridData.keyOverlapPercentage
+            keyOverlapPercentage: this.gridData.keyOverlapPercentage,
+            columnAliasKeysReceived: this.gridData.columnAliasKeysReceived || []
         };
     }
     
@@ -739,18 +834,22 @@ export default class MergedReportGrid extends LightningElement {
         }
         
         if (this.columnAliasesJson) {
-            try {
-                JSON.parse(this.columnAliasesJson);
+            const parsed = this._tryParseColumnAliasesJson(this.columnAliasesJson);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                const received = this.gridData?.columnAliasKeysReceived || [];
+                const apexNote = received.length > 0
+                    ? ` Apex received keys: ${JSON.stringify(received)} (custom format applies).`
+                    : ' Labels apply client-side; custom format (from extended config) requires Apex to receive keys.';
                 recs.push({
                     type: 'INFO',
                     issue: 'Column Aliases configured',
-                    fix: 'Keys must exactly match originalLabelForAlias in Columns & Data (spaces, underscores matter)'
+                    fix: 'Labels applied client-side. Match by originalLabel or by index.' + apexNote
                 });
-            } catch (e) {
+            } else {
                 recs.push({
                     type: 'ERROR',
                     issue: 'Invalid Column Aliases JSON',
-                    fix: 'Check JSON syntax'
+                    fix: 'Use valid JSON only, e.g. {"Record Count": "Count"}. Remove trailing text (e.g. from copy-paste).'
                 });
             }
         }

@@ -33,6 +33,9 @@ public with sharing class MergedReportController {
         try {
             // Parse and validate options
             MergeOptions options = parseOptions(optionsJson);
+            result.columnAliasKeysReceived = (options.columnAliases != null && !options.columnAliases.isEmpty())
+                ? new List<String>(options.columnAliases.keySet())
+                : new List<String>();
             result.warnings.addAll(options.validate());
             
             // Validate report IDs
@@ -110,6 +113,11 @@ public with sharing class MergedReportController {
                 addCalculatedFields(options, result);
             }
             
+            // Sort rows AFTER all columns (report, tier, calculated) are present
+            if (result.rows != null && !result.rows.isEmpty()) {
+                sortRows(result.rows, options, result.columns);
+            }
+            
             // Calculate key overlap percentage
             result.keyOverlapPercentage = calculateKeyOverlap(parsedReports);
             if (result.keyOverlapPercentage < 70) {
@@ -137,40 +145,133 @@ public with sharing class MergedReportController {
     }
     
     /**
-     * @description Parses the options JSON string.
-     * Manually extracts columnAliases because Apex JSON.deserialize does not reliably
-     * populate Map<String, Object> in class properties.
+     * @description Parses the options JSON string using JSON.deserializeUntyped to avoid
+     * Apex's JSON.deserialize failing on Map<String, Object> properties (columnAliases).
+     * When JSON.deserialize encounters a Map<String, Object> with actual values, it can
+     * throw, and the catch block would return a blank MergeOptions -- silently killing
+     * calculatedFields, tierLookups, and everything else.
      */
     private static MergeOptions parseOptions(String optionsJson) {
         if (String.isBlank(optionsJson)) {
             return new MergeOptions();
         }
         try {
-            MergeOptions options = (MergeOptions) JSON.deserialize(optionsJson, MergeOptions.class);
-            // Manually extract columnAliases - JSON.deserialize often fails to populate Map<String, Object>
-            extractColumnAliasesFromJson(optionsJson, options);
+            Object root = JSON.deserializeUntyped(optionsJson);
+            if (!(root instanceof Map<String, Object>)) {
+                return new MergeOptions();
+            }
+            Map<String, Object> m = (Map<String, Object>) root;
+            MergeOptions options = new MergeOptions();
+
+            // Simple string fields
+            if (m.containsKey('mergeMode'))      options.mergeMode      = String.valueOf(m.get('mergeMode'));
+            if (m.containsKey('dataVisibility')) options.dataVisibility = String.valueOf(m.get('dataVisibility'));
+            if (m.containsKey('sortBy'))         options.sortBy         = String.valueOf(m.get('sortBy'));
+            if (m.containsKey('sortDirection'))  options.sortDirection  = String.valueOf(m.get('sortDirection'));
+            if (m.containsKey('sortGroupsBy') && m.get('sortGroupsBy') != null)
+                options.sortGroupsBy = String.valueOf(m.get('sortGroupsBy'));
+            if (m.containsKey('subtotalLabel') && m.get('subtotalLabel') != null)
+                options.subtotalLabel = String.valueOf(m.get('subtotalLabel'));
+
+            // Integer fields
+            if (m.containsKey('maxRows') && m.get('maxRows') != null)
+                options.maxRows = ((Decimal) m.get('maxRows')).intValue();
+
+            // Boolean fields
+            if (m.containsKey('missingValueAsZero') && m.get('missingValueAsZero') != null)
+                options.missingValueAsZero = (Boolean) m.get('missingValueAsZero');
+            if (m.containsKey('showGrandTotalRow') && m.get('showGrandTotalRow') != null)
+                options.showGrandTotalRow = (Boolean) m.get('showGrandTotalRow');
+            if (m.containsKey('showSubtotals') && m.get('showSubtotals') != null)
+                options.showSubtotals = (Boolean) m.get('showSubtotals');
+            if (m.containsKey('fillMissingCategories') && m.get('fillMissingCategories') != null)
+                options.fillMissingCategories = (Boolean) m.get('fillMissingCategories');
+
+            // dimensionConstants: Map<String, String>
+            Object dcObj = m.get('dimensionConstants');
+            if (dcObj != null && dcObj instanceof Map<String, Object>) {
+                Map<String, String> dcMap = new Map<String, String>();
+                for (String k : ((Map<String, Object>) dcObj).keySet()) {
+                    Object v = ((Map<String, Object>) dcObj).get(k);
+                    dcMap.put(k, v != null ? String.valueOf(v) : null);
+                }
+                options.dimensionConstants = dcMap;
+            }
+
+            // columnAliases: Map<String, Object> - copy to fresh map
+            Object caObj = m.get('columnAliases');
+            if (caObj != null && caObj instanceof Map<String, Object>) {
+                Map<String, Object> aliasMap = new Map<String, Object>();
+                for (String k : ((Map<String, Object>) caObj).keySet()) {
+                    aliasMap.put(k, ((Map<String, Object>) caObj).get(k));
+                }
+                options.columnAliases = aliasMap;
+            }
+
+            // calculatedFields: List<CalculatedField>
+            Object cfObj = m.get('calculatedFields');
+            if (cfObj != null && cfObj instanceof List<Object>) {
+                List<MergeOptions.CalculatedField> cfList = new List<MergeOptions.CalculatedField>();
+                for (Object item : (List<Object>) cfObj) {
+                    if (!(item instanceof Map<String, Object>)) continue;
+                    Map<String, Object> cfm = (Map<String, Object>) item;
+                    MergeOptions.CalculatedField cf = new MergeOptions.CalculatedField();
+                    if (cfm.containsKey('label'))    cf.label    = String.valueOf(cfm.get('label'));
+                    if (cfm.containsKey('formula'))  cf.formula  = String.valueOf(cfm.get('formula'));
+                    if (cfm.containsKey('dataType')) cf.dataType = String.valueOf(cfm.get('dataType'));
+                    if (cfm.containsKey('format'))   cf.format   = String.valueOf(cfm.get('format'));
+                    if (cfm.containsKey('decimals') && cfm.get('decimals') != null)
+                        cf.decimals = ((Decimal) cfm.get('decimals')).intValue();
+                    if (cfm.containsKey('currencyCode') && cfm.get('currencyCode') != null)
+                        cf.currencyCode = String.valueOf(cfm.get('currencyCode'));
+                    cfList.add(cf);
+                }
+                options.calculatedFields = cfList;
+            }
+
+            // tierLookups: List<TierLookup>
+            Object tlObj = m.get('tierLookups');
+            if (tlObj != null && tlObj instanceof List<Object>) {
+                List<MergeOptions.TierLookup> tlList = new List<MergeOptions.TierLookup>();
+                for (Object item : (List<Object>) tlObj) {
+                    if (!(item instanceof Map<String, Object>)) continue;
+                    Map<String, Object> tlm = (Map<String, Object>) item;
+                    MergeOptions.TierLookup tl = new MergeOptions.TierLookup();
+                    if (tlm.containsKey('label'))        tl.label        = String.valueOf(tlm.get('label'));
+                    if (tlm.containsKey('inputFormula'))  tl.inputFormula  = String.valueOf(tlm.get('inputFormula'));
+                    if (tlm.containsKey('format'))       tl.format       = String.valueOf(tlm.get('format'));
+                    if (tlm.containsKey('dataType'))     tl.dataType     = String.valueOf(tlm.get('dataType'));
+                    if (tlm.containsKey('nullWhenZero') && tlm.get('nullWhenZero') != null)
+                        tl.nullWhenZero = (Boolean) tlm.get('nullWhenZero');
+                    if (tlm.containsKey('decimals') && tlm.get('decimals') != null)
+                        tl.decimals = ((Decimal) tlm.get('decimals')).intValue();
+
+                    // tiers: List<TierEntry>
+                    Object tiersObj = tlm.get('tiers');
+                    if (tiersObj != null && tiersObj instanceof List<Object>) {
+                        List<MergeOptions.TierEntry> teList = new List<MergeOptions.TierEntry>();
+                        for (Object te : (List<Object>) tiersObj) {
+                            if (!(te instanceof Map<String, Object>)) continue;
+                            Map<String, Object> tem = (Map<String, Object>) te;
+                            MergeOptions.TierEntry entry = new MergeOptions.TierEntry();
+                            if (tem.containsKey('min') && tem.get('min') != null)
+                                entry.min = (Decimal) tem.get('min');
+                            if (tem.containsKey('value') && tem.get('value') != null)
+                                entry.value = (Decimal) tem.get('value');
+                            teList.add(entry);
+                        }
+                        tl.tiers = teList;
+                    }
+                    tlList.add(tl);
+                }
+                options.tierLookups = tlList;
+            }
+
             return options;
         } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'parseOptions failed: ' + e.getTypeName()
+                + ': ' + e.getMessage() + '\n' + e.getStackTraceString());
             return new MergeOptions();
-        }
-    }
-    
-    /**
-     * @description Extracts columnAliases from raw JSON and sets on options.
-     * Required because Apex JSON.deserialize does not properly populate Map<String, Object> properties.
-     */
-    private static void extractColumnAliasesFromJson(String optionsJson, MergeOptions options) {
-        try {
-            Object root = JSON.deserializeUntyped(optionsJson);
-            if (!(root instanceof Map<String, Object>)) return;
-            Map<String, Object> rootMap = (Map<String, Object>) root;
-            Object colObj = rootMap.get('columnAliases');
-            if (colObj == null) return;
-            if (colObj instanceof Map<String, Object>) {
-                options.columnAliases = (Map<String, Object>) colObj;
-            }
-        } catch (Exception e) {
-            // Ignore - use whatever columnAliases the class deserializer produced (possibly null/empty)
         }
     }
     
@@ -823,11 +924,12 @@ public with sharing class MergedReportController {
     ) {
         List<MergedGridDTO.ColumnDefinition> columns = new List<MergedGridDTO.ColumnDefinition>();
         
-        // Key column (Dim 1) - apply alias if configured
+        // Key column (Dim 1) - LWC applies aliases; Apex sends original
         MergedGridDTO.ColumnDefinition keyCol = new MergedGridDTO.ColumnDefinition();
         keyCol.key = 'keyLabel';
         String originalKeyLabel = parsedReports[0].groupingLabel;
-        keyCol.label = options.getColumnAlias(originalKeyLabel);
+        keyCol.originalLabel = originalKeyLabel;
+        keyCol.label = originalKeyLabel;
         keyCol.dataType = 'STRING';
         keyCol.isKeyColumn = true;
         columns.add(keyCol);
@@ -849,9 +951,10 @@ public with sharing class MergedReportController {
                 originalSecondLabel = 'Category';
             }
             
-            // Apply alias to second dimension column
-            secondKeyCol.label = options.getColumnAlias(originalSecondLabel);
-            result.secondDimensionLabel = secondKeyCol.label;
+            // LWC applies aliases; Apex sends original
+            secondKeyCol.originalLabel = originalSecondLabel;
+            secondKeyCol.label = originalSecondLabel;
+            result.secondDimensionLabel = originalSecondLabel;
             
             secondKeyCol.dataType = 'STRING';
             secondKeyCol.isSecondKeyColumn = true;
@@ -903,9 +1006,9 @@ public with sharing class MergedReportController {
                 col.dataType = aggInfo.dataType;
                 col.reportName = parsed.reportName;
                 
-                // Store original label and apply alias + custom format
+                // Store original; LWC applies aliases. Apex applies format from alias config.
                 col.originalLabel = label;
-                col.label = options.getColumnAlias(label);
+                col.label = label;
                 col.customFormat = options.getColumnFormat(label);
                 col.customDecimals = options.getColumnDecimals(label);
                 col.customCurrencyCode = options.getColumnCurrencyCode(label);
@@ -1176,8 +1279,7 @@ public with sharing class MergedReportController {
             rows.add(row);
         }
         
-        // Sort rows
-        sortRows(rows, options, result.columns);
+        // Sorting moved to getMergedReportData (after tier/calc columns are added)
         
         // Apply row limit
         if (rows.size() > options.maxRows) {
@@ -1232,12 +1334,13 @@ public with sharing class MergedReportController {
         }
         Boolean hasSecondDimension = (maxDims == 2);
         
-        // Key column - apply alias if configured
+        // Key column - LWC applies aliases; Apex sends original
         MergedGridDTO.ColumnDefinition keyCol = new MergedGridDTO.ColumnDefinition();
         keyCol.key = 'keyLabel';
         String originalKeyLabel = parsedReports[0].groupingLabel != null ? 
             parsedReports[0].groupingLabel : parsedReports[0].groupingField;
-        keyCol.label = options.getColumnAlias(originalKeyLabel);
+        keyCol.originalLabel = originalKeyLabel;
+        keyCol.label = originalKeyLabel;
         keyCol.dataType = 'STRING';
         keyCol.isKeyColumn = true;
         columns.add(keyCol);
@@ -1254,7 +1357,8 @@ public with sharing class MergedReportController {
                     break;
                 }
             }
-            secondKeyCol.label = options.getColumnAlias(secondKeyLabel);
+            secondKeyCol.originalLabel = secondKeyLabel;
+            secondKeyCol.label = secondKeyLabel;
             secondKeyCol.dataType = 'STRING';
             secondKeyCol.isSecondKeyColumn = true;
             columns.add(secondKeyCol);
@@ -1289,20 +1393,8 @@ public with sharing class MergedReportController {
                     fullLabel = originalLabel;
                 }
                 
-                String displayLabel = options.getColumnAlias(fullLabel);
-                if (displayLabel.equals(fullLabel)) {
-                    String baseAlias = options.getColumnAlias(originalLabel);
-                    if (!baseAlias.equals(originalLabel)) {
-                        if (fullLabel.contains(' (')) {
-                            String suffix = fullLabel.substring(fullLabel.lastIndexOf(' ('));
-                            displayLabel = baseAlias + suffix;
-                        } else {
-                            displayLabel = baseAlias;
-                        }
-                    }
-                }
-                
-                col.label = displayLabel;
+                // LWC applies aliases; Apex sends original for consistent formula resolution
+                col.label = fullLabel;
                 
                 // Store original label and apply custom format (try fullLabel first, then originalLabel)
                 col.originalLabel = fullLabel;
@@ -1347,6 +1439,7 @@ public with sharing class MergedReportController {
             MergedGridDTO.ColumnDefinition col = new MergedGridDTO.ColumnDefinition();
             col.key = 'tier_' + sanitizeKey(tl.label);
             col.label = tl.label;
+            col.originalLabel = tl.label;
             col.dataType = (tl.dataType != null) ? tl.dataType : 'DOUBLE_DATA';
             col.isKeyColumn = false;
             parseAndApplyTierLookupFormat(tl, col);
@@ -1470,8 +1563,10 @@ public with sharing class MergedReportController {
             ? result.totalsRow.values : new Map<String, Decimal>();
         Map<String, String> baseLabelToBestKey = new Map<String, String>();
         for (MergedGridDTO.ColumnDefinition existingCol : result.columns) {
-            if (existingCol.isKeyColumn || existingCol.isSecondKeyColumn || String.isBlank(existingCol.label)) continue;
-            String baseLabel = getBaseLabelForDuplicateCheck(existingCol.label);
+            if (existingCol.isKeyColumn || existingCol.isSecondKeyColumn) continue;
+            String colLabel = String.isNotBlank(existingCol.label) ? existingCol.label : existingCol.originalLabel;
+            if (String.isBlank(colLabel)) continue;
+            String baseLabel = getBaseLabelForDuplicateCheck(colLabel);
             Decimal total = totalByKey.get(existingCol.key);
             Decimal totalAbs = (total != null) ? total.abs() : Decimal.valueOf(0);
             String bestKey = baseLabelToBestKey.get(baseLabel);
@@ -1483,9 +1578,19 @@ public with sharing class MergedReportController {
         Map<String, String> labelToKey = new Map<String, String>();
         for (MergedGridDTO.ColumnDefinition existingCol : result.columns) {
             if (!existingCol.isKeyColumn && !existingCol.isSecondKeyColumn) {
-                if (String.isNotBlank(existingCol.label)) {
+                // Use original labels only - formulas reference report names, never display aliases
+                if (String.isNotBlank(existingCol.aggregateLabel) && !labelToKey.containsKey(existingCol.aggregateLabel)) {
+                    labelToKey.put(existingCol.aggregateLabel, existingCol.key);
+                }
+                if (String.isNotBlank(existingCol.originalLabel) && !labelToKey.containsKey(existingCol.originalLabel)) {
+                    labelToKey.put(existingCol.originalLabel, existingCol.key);
+                }
+                if (String.isNotBlank(existingCol.label) && !labelToKey.containsKey(existingCol.label)) {
                     labelToKey.put(existingCol.label, existingCol.key);
-                    String baseLabel = getBaseLabelForDuplicateCheck(existingCol.label);
+                }
+                String baseLabel = getBaseLabelForDuplicateCheck(
+                    String.isNotBlank(existingCol.originalLabel) ? existingCol.originalLabel : existingCol.label);
+                if (String.isNotBlank(baseLabel)) {
                     labelToKey.put(baseLabel, baseLabelToBestKey.get(baseLabel));
                 }
                 labelToKey.put(existingCol.key, existingCol.key);
@@ -1517,9 +1622,9 @@ public with sharing class MergedReportController {
             MergedGridDTO.ColumnDefinition col = new MergedGridDTO.ColumnDefinition();
             col.key = 'calc_' + sanitizeKey(calcField.label);
             col.label = calcField.label;
+            col.originalLabel = calcField.label;
             col.dataType = calcField.dataType != null ? calcField.dataType : 'DOUBLE_DATA';
             col.isKeyColumn = false;
-            // Apply format, decimals, currency from calculated field
             parseAndApplyCalculatedFieldFormat(calcField, col);
             result.columns.add(col);
             
@@ -1805,15 +1910,41 @@ public with sharing class MergedReportController {
         MergeOptions options,
         List<MergedGridDTO.ColumnDefinition> columns
     ) {
-        Integer sortColIndex = options.getSortColumnIndex();
+        Integer sortColIndex = resolveSortColumnIndex(options.sortBy, columns);
         Boolean isAscending = options.sortDirection == MergeOptions.SORT_DIRECTION_ASC;
         
         if (sortColIndex == 0) {
             rows.sort(new KeyLabelComparator(isAscending));
-        } else if (sortColIndex <= columns.size() - 1) {
+        } else if (sortColIndex != null && sortColIndex <= columns.size() - 1) {
             String colKey = columns[sortColIndex].key;
             rows.sort(new ColumnValueComparator(colKey, isAscending));
         }
+    }
+    
+    /**
+     * @description Resolves sortBy to column index. Supports: numeric index (0, 1, 5), KEY/keyLabel, secondKeyLabel, REPORTn_VALUE, and column keys (e.g. calc_Fund_).
+     */
+    private static Integer resolveSortColumnIndex(String sortBy, List<MergedGridDTO.ColumnDefinition> columns) {
+        if (String.isBlank(sortBy) || sortBy == MergeOptions.SORT_BY_KEY || sortBy == 'keyLabel') return 0;
+        if (sortBy == 'secondKeyLabel') return 1;
+        // Numeric index (from Sort By Column Index property)
+        try {
+            Integer idx = Integer.valueOf(sortBy.trim());
+            if (idx >= 0 && idx < columns.size()) return idx;
+            if (idx >= 0) return 0;
+        } catch (Exception e) { /* not a number */ }
+        // Resolve by column key (from click-to-sort: calc_X, tier_X, r1_X)
+        for (Integer i = 0; i < columns.size(); i++) {
+            if (columns[i].key == sortBy) return i;
+        }
+        // Legacy: REPORTn_VALUE
+        if (sortBy != null && sortBy.startsWith('REPORT') && sortBy.endsWith('_VALUE')) {
+            try {
+                Integer idx = Integer.valueOf(sortBy.removeStart('REPORT').removeEnd('_VALUE'));
+                return (idx >= 0 && idx < columns.size()) ? idx : 0;
+            } catch (Exception e) { /* fall through */ }
+        }
+        return 0;
     }
     
     private static Decimal calculateKeyOverlap(List<MergedGridDTO.ParsedReportData> parsedReports) {

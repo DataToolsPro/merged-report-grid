@@ -16,7 +16,7 @@ Add tier-based rate lookups to the Merged Report Grid without complex nested IF 
 
 ### Bug Fix
 
-- **Column Aliases** – Aliases were not applied because Apex `JSON.deserialize` does not populate `Map<String, Object>` in class properties. Now manually extracts `columnAliases` via `JSON.deserializeUntyped`. Added trimmed-label fallback for robustness. **Note:** After deployment, change an alias slightly and save the page to bust cache if aliases don’t appear immediately.
+- **Column Aliases** – Aliases were not applied because Apex JSON.deserialize fails on Map in class properties. parseOptions now uses JSON.deserializeUntyped to manually populate all options. Added trimmed-label fallback for robustness.
 
 ### Example
 
@@ -54,7 +54,7 @@ Add tier-based rate lookups to the Merged Report Grid without complex nested IF 
 | Component | Changes |
 |-----------|---------|
 | MergeOptions.cls | `tierLookups`, `TierLookup`, `TierEntry`; `getColumnConfig()` trim fallback |
-| MergedReportController.cls | `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()`, `extractColumnAliasesFromJson()` |
+| MergedReportController.cls | `addTierLookups()`, `evaluateTierLookup()`, `buildLabelToKeyForFormulas()`; `parseOptions()` uses `JSON.deserializeUntyped` for all options |
 | mergedReportGrid (LWC) | `tierLookupsJson` property |
 | MergedReportControllerTest.cls | Tier lookup unit and integration tests |
 
