@@ -2,7 +2,7 @@
 
 A Lightning Web Component that merges 2-5 Salesforce reports into a single unified grid.
 
-**Version:** 1.5.3
+**Version:** 1.5.5
 
 ---
 
@@ -938,5 +938,5 @@ For issues or feature requests, please open an issue in the repository.
 
 ---
 
-**Version:** 1.5.3  
+**Version:** 1.5.5  
 **Last Updated:** February 2026

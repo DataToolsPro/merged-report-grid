@@ -14,10 +14,11 @@ public with sharing class MergedReportController {
     // Blank key token
     private static final String BLANK_KEY_TOKEN = '(Blank)';
     private static final String KEY_SEPARATOR = '||';
+
+    /** Test seam: when set in test context, bypasses fetchAndParseReport and uses this data instead */
+    @TestVisible
+    private static List<MergedGridDTO.ParsedReportData> testParsedReportsOverride = null;
     
-    // Debug flag: Set to true to include stack traces in error messages (for debugging only)
-    // SECURITY: Keep this false in production to prevent information disclosure
-    private static final Boolean INCLUDE_STACK_TRACES_IN_ERRORS = false;
     
     /**
      * @description Main entry point - fetches and merges data from multiple reports
@@ -47,33 +48,41 @@ public with sharing class MergedReportController {
                 return result;
             }
             
-            // Fetch and parse each report
+            // Fetch and parse each report (or use test-injected data)
             List<MergedGridDTO.ParsedReportData> parsedReports = new List<MergedGridDTO.ParsedReportData>();
-            
-            for (Integer i = 0; i < reportIds.size(); i++) {
-                Id reportId = reportIds[i];
-                MergedGridDTO.ParsedReportData parsed = fetchAndParseReport(reportId, i, options);
-                
-                // Store report name for UI display (even if report has errors)
-                if (String.isNotBlank(parsed.reportName)) {
-                    result.reportNames.put(String.valueOf(reportId), parsed.reportName);
-                }
-                
-                if (!parsed.isValid) {
-                    MergedGridDTO.ReportError error = new MergedGridDTO.ReportError(
-                        reportId,
-                        parsed.errorMessage,
-                        i < 2 // First two reports are required
-                    );
-                    error.reportName = parsed.reportName;
-                    result.errors.add(error);
-                    
-                    if (i < 2) {
-                        result.processingTimeMs = System.currentTimeMillis() - startTime;
-                        return result;
+            if (Test.isRunningTest() && testParsedReportsOverride != null && testParsedReportsOverride.size() >= 2) {
+                parsedReports = testParsedReportsOverride;
+                for (MergedGridDTO.ParsedReportData p : parsedReports) {
+                    if (String.isNotBlank(p.reportName) && p.reportId != null) {
+                        result.reportNames.put(String.valueOf(p.reportId), p.reportName);
                     }
-                } else {
-                    parsedReports.add(parsed);
+                }
+            } else {
+                for (Integer i = 0; i < reportIds.size(); i++) {
+                    Id reportId = reportIds[i];
+                    MergedGridDTO.ParsedReportData parsed = fetchAndParseReport(reportId, i, options);
+                    
+                    // Store report name for UI display (even if report has errors)
+                    if (String.isNotBlank(parsed.reportName)) {
+                        result.reportNames.put(String.valueOf(reportId), parsed.reportName);
+                    }
+                    
+                    if (!parsed.isValid) {
+                        MergedGridDTO.ReportError error = new MergedGridDTO.ReportError(
+                            reportId,
+                            parsed.errorMessage,
+                            i < 2 // First two reports are required
+                        );
+                        error.reportName = parsed.reportName;
+                        result.errors.add(error);
+                        
+                        if (i < 2) {
+                            result.processingTimeMs = System.currentTimeMillis() - startTime;
+                            return result;
+                        }
+                    } else {
+                        parsedReports.add(parsed);
+                    }
                 }
             }
             
@@ -343,33 +352,6 @@ public with sharing class MergedReportController {
         }
         
         if (!options.isUnionMode()) {
-            // JOIN mode: Dimensions must match (unless dimension constants handle the gap)
-            if (maxDims != minDims) {
-                // If we get here, dimension constants weren't configured - already handled above
-                // This shouldn't be reached, but keep as safety check
-                List<String> oneDimReports = new List<String>();
-                List<String> twoDimReports = new List<String>();
-                
-                for (MergedGridDTO.ParsedReportData parsed : parsedReports) {
-                    String reportRef = 'Report ' + (parsed.reportIndex + 1) + ' ("' + parsed.reportName + '")';
-                    if (parsed.dimensionCount == 1) {
-                        oneDimReports.add(reportRef);
-                    } else {
-                        twoDimReports.add(reportRef);
-                    }
-                }
-                
-                String errorMsg = 'JOIN mode requires all reports to have the same number of dimensions.\n\n';
-                errorMsg += '1 dimension: ' + String.join(oneDimReports, ', ') + '\n';
-                errorMsg += '2 dimensions: ' + String.join(twoDimReports, ', ') + '\n\n';
-                errorMsg += 'Options:\n';
-                errorMsg += '• Set Dimension Constants for reports with fewer dimensions\n';
-                errorMsg += '• Change Merge Mode to UNION (allows different dimensions)\n';
-                errorMsg += '• Modify reports so they all have the same number of group-by fields';
-                
-                return errorMsg;
-            }
-            
             // Check dimension field names match (skip for reports using constants)
             String firstDim1 = parsedReports[0].groupingField;
             String firstDim2 = parsedReports[0].secondGroupingField;
@@ -1795,8 +1777,8 @@ public with sharing class MergedReportController {
             // Strip outer parentheses if the whole expression is wrapped
             formula = stripOuterParentheses(formula);
             
-            // Find first operator at depth 0 (lowest precedence first for correct order of ops)
-            OperatorMatch addSub = findFirstOperatorAtDepth(formula, new List<String>{' + ', ' - '});
+            // Find last +/- at depth 0 (left-associative: A - B - C = (A - B) - C)
+            OperatorMatch addSub = findLastOperatorAtDepth(formula, new List<String>{' + ', ' - '});
             if (addSub != null) {
                 String left = formula.substring(0, addSub.idx).trim();
                 String right = formula.substring(addSub.idx + addSub.op.length()).trim();
@@ -1807,7 +1789,8 @@ public with sharing class MergedReportController {
                 return addSub.op.contains('+') ? leftVal + rightVal : leftVal - rightVal;
             }
             
-            OperatorMatch mulDiv = findFirstOperatorAtDepth(formula, new List<String>{' * ', ' / '});
+            // Find last * / at depth 0 (left-associative: A / B / C = (A / B) / C)
+            OperatorMatch mulDiv = findLastOperatorAtDepth(formula, new List<String>{' * ', ' / '});
             if (mulDiv != null) {
                 String left = formula.substring(0, mulDiv.idx).trim();
                 String right = formula.substring(mulDiv.idx + mulDiv.op.length()).trim();
@@ -1854,11 +1837,13 @@ public with sharing class MergedReportController {
     }
     
     /**
-     * @description Finds the first occurrence of any operator at parenthesis depth 0
+     * @description Finds the last occurrence of any operator at parenthesis depth 0.
+     * Used for left-associative evaluation: A - B - C = (A - B) - C, A / B / C = (A / B) / C.
      */
-    private static OperatorMatch findFirstOperatorAtDepth(String formula, List<String> operators) {
+    private static OperatorMatch findLastOperatorAtDepth(String formula, List<String> operators) {
         Integer depth = 0;
         Integer len = formula.length();
+        OperatorMatch last = null;
         for (Integer i = 0; i < len; i++) {
             String c = formula.substring(i, i + 1);
             if (c == '(') depth++;
@@ -1866,12 +1851,13 @@ public with sharing class MergedReportController {
             if (depth == 0) {
                 for (String op : operators) {
                     if (i + op.length() <= len && formula.substring(i, i + op.length()) == op) {
-                        return new OperatorMatch(i, op);
+                        last = new OperatorMatch(i, op);
+                        break;
                     }
                 }
             }
         }
-        return null;
+        return last;
     }
     
     /**
@@ -2009,11 +1995,6 @@ public with sharing class MergedReportController {
             } else if (msg.contains('timeout') || msg.contains('TIMEOUT')) {
                 userMessage = 'The request timed out. Please try again or reduce the number of reports.';
             }
-        }
-        
-        // Optionally append stack trace for debugging (controlled by INCLUDE_STACK_TRACES_IN_ERRORS flag)
-        if (INCLUDE_STACK_TRACES_IN_ERRORS) {
-            userMessage += ' - ' + e.getStackTraceString();
         }
         
         return userMessage;

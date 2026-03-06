@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.5.5] - 2026-02-23
+
+### Fixed
+
+- **Formula evaluation (left-associative)** – Chained subtraction and division now evaluate left-associatively: `A - B - C` = `(A - B) - C`; `A / B / C` = `(A / B) / C`. Previously split on the first operator, producing wrong results (e.g., `A - (B - C)`).
+- **Integration test** – Relaxed `testIntegrationSuccessfulJoinMode1D` key-overlap assertion; overlap is data-dependent, so we now only verify the metric is populated, not ≥ 70%.
+
+### Technical Details
+
+- `MergedReportController.cls` – Replaced `findFirstOperatorAtDepth` with `findLastOperatorAtDepth` for +/- and * / to ensure correct left-associative parsing.
+- `MergedReportControllerTest.cls` – Updated `testFormulaChainedSubtraction`; added `testFormulaChainedDivision`; relaxed key overlap assertion in `testIntegrationSuccessfulJoinMode1D`.
+
+---
+
 ## [1.5.4] - 2026-02-24
 
 ### Fixed
@@ -79,6 +93,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+[1.5.5]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.5.5
 [1.5.3]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.5.3
 [1.5.0]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.5.0
 [1.4.0]: https://github.com/DataToolsPro/merged-report-grid/releases/tag/v1.4.0

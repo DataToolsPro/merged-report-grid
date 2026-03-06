@@ -469,8 +469,16 @@ private class MergedReportControllerTest {
     static void testFormulaChainedSubtraction() {
         Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 100, 'B' => 20, 'C' => 10 };
         Decimal result = MergedReportController.evaluateFormula('A - B - C', values);
-        // Splits on first -, so A - (B - C) = 100 - 10 = 90 (right-associative)
-        System.assertEquals(90, result, 'A - (B - C) = 90 when splitting on first -');
+        // Left-associative: (A - B) - C = 80 - 10 = 70
+        System.assertEquals(70, result, 'A - B - C = (A - B) - C = 70');
+    }
+
+    @IsTest
+    static void testFormulaChainedDivision() {
+        Map<String, Decimal> values = new Map<String, Decimal>{ 'A' => 100, 'B' => 10, 'C' => 2 };
+        Decimal result = MergedReportController.evaluateFormula('A / B / C', values);
+        // Left-associative: (A / B) / C = 10 / 2 = 5
+        System.assertEquals(5, result, 'A / B / C = (A / B) / C = 5');
     }
     
     @IsTest
@@ -1325,7 +1333,357 @@ private class MergedReportControllerTest {
      * @description Custom exception for test failures
      */
     private class TestException extends Exception {}
-    
+
+    // ========================================================================
+    // INJECTED DATA TESTS (no SeeAllData - uses testParsedReportsOverride)
+    // ========================================================================
+
+    private static MergedGridDTO.ParsedReportData buildParsedReport1D(String reportId, Integer reportIndex, String reportName) {
+        MergedGridDTO.ParsedReportData p = new MergedGridDTO.ParsedReportData();
+        p.reportId = reportId;
+        p.reportIndex = reportIndex;
+        p.reportName = reportName;
+        p.groupingField = 'OwnerId';
+        p.groupingLabel = 'Owner';
+        p.dimensionCount = 1;
+        p.aggregates.add(new MergedGridDTO.AggregateInfo('RowCount', 'Record Count', 'INT_DATA', 0));
+
+        p.primaryKeys.add('A');
+        p.primaryKeys.add('B');
+        p.labelsByKey.put('A', 'Owner A');
+        p.labelsByKey.put('B', 'Owner B');
+        p.valuesByKeyByAggregate.put('A', new Map<String, Decimal>{ 'RowCount' => 10 });
+        p.valuesByKeyByAggregate.put('B', new Map<String, Decimal>{ 'RowCount' => 20 });
+        p.grandTotals.put('RowCount', 30);
+        return p;
+    }
+
+    private static MergedGridDTO.ParsedReportData buildParsedReport2D(String reportId, Integer reportIndex, String reportName) {
+        MergedGridDTO.ParsedReportData p = new MergedGridDTO.ParsedReportData();
+        p.reportId = reportId;
+        p.reportIndex = reportIndex;
+        p.reportName = reportName;
+        p.groupingField = 'OwnerId';
+        p.groupingLabel = 'Owner';
+        p.secondGroupingField = 'Status';
+        p.secondGroupingLabel = 'Status';
+        p.dimensionCount = 2;
+        p.aggregates.add(new MergedGridDTO.AggregateInfo('RowCount', 'Record Count', 'INT_DATA', 0));
+
+        p.primaryKeys.add('A');
+        p.primaryKeys.add('B');
+        p.secondaryKeys.add('X');
+        p.secondaryKeys.add('Y');
+        String keyAX = 'A||X', keyAY = 'A||Y', keyBX = 'B||X', keyBY = 'B||Y';
+        p.labelsByKey.put(keyAX, 'Owner A');
+        p.labelsByKey.put(keyAY, 'Owner A');
+        p.labelsByKey.put(keyBX, 'Owner B');
+        p.labelsByKey.put(keyBY, 'Owner B');
+        p.secondLabelsByKey.put(keyAX, 'X');
+        p.secondLabelsByKey.put(keyAY, 'Y');
+        p.secondLabelsByKey.put(keyBX, 'X');
+        p.secondLabelsByKey.put(keyBY, 'Y');
+        p.valuesByKeyByAggregate.put(keyAX, new Map<String, Decimal>{ 'RowCount' => 5 });
+        p.valuesByKeyByAggregate.put(keyAY, new Map<String, Decimal>{ 'RowCount' => 5 });
+        p.valuesByKeyByAggregate.put(keyBX, new Map<String, Decimal>{ 'RowCount' => 10 });
+        p.valuesByKeyByAggregate.put(keyBY, new Map<String, Decimal>{ 'RowCount' => 10 });
+        p.grandTotals.put('RowCount', 30);
+        return p;
+    }
+
+    @IsTest
+    static void testMergeUnionWithInjectedData() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport1D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport1D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        System.assertNotEquals(null, result.columns);
+        System.assertNotEquals(null, result.rows);
+        System.assert(result.rows.size() >= 2);
+    }
+
+    @IsTest
+    static void testMergeJoinWithInjectedData() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport1D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport1D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'OUTER_JOIN',
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        System.assertNotEquals(null, result.columns);
+        System.assertNotEquals(null, result.rows);
+        System.assertEquals(false, result.hasSecondDimension);
+    }
+
+    @IsTest
+    static void testMergeJoinInnerJoin() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedGridDTO.ParsedReportData r1 = buildParsedReport1D('00O000000000001AAA', 0, 'Report 1');
+        MergedGridDTO.ParsedReportData r2 = buildParsedReport1D('00O000000000002AAA', 1, 'Report 2');
+        r1.valuesByKeyByAggregate.put('C', new Map<String, Decimal>{ 'RowCount' => 15 });
+        r1.primaryKeys.add('C');
+        r1.labelsByKey.put('C', 'Owner C');
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{ r1, r2 };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'INNER_JOIN',
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        System.assertEquals(2, result.rows.size());
+    }
+
+    @IsTest
+    static void testMergeUnion2DWithSubtotals() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport2D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport2D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'showSubtotals' => true,
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        System.assertEquals(true, result.hasSecondDimension);
+        Boolean hasSubtotal = false;
+        for (MergedGridDTO.GridRow row : result.rows) {
+            if (row.isSubtotalRow != null && row.isSubtotalRow) {
+                hasSubtotal = true;
+                break;
+            }
+        }
+        System.assert(hasSubtotal);
+    }
+
+    @IsTest
+    static void testMergeUnionFillMissingCategories() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedGridDTO.ParsedReportData r1 = buildParsedReport2D('00O000000000001AAA', 0, 'Report 1');
+        MergedGridDTO.ParsedReportData r2 = buildParsedReport2D('00O000000000002AAA', 1, 'Report 2');
+        r2.valuesByKeyByAggregate.remove('A||Y');
+        r2.secondaryKeys.add('Y');
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{ r1, r2 };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'fillMissingCategories' => true,
+            'missingValueAsZero' => true,
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        System.assertEquals(true, result.hasSecondDimension);
+    }
+
+    @IsTest
+    static void testMergeUnionSortGroupsBy() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport2D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport2D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'UNION',
+            'sortGroupsBy' => 'merged_Record_Count',
+            'sortDirection' => 'DESC',
+            'showGrandTotalRow' => true
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+    }
+
+    @IsTest
+    static void testTierLookupsWithInjectedData() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport1D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport1D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'OUTER_JOIN',
+            'tierLookups' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => 'Rate',
+                    'inputFormula' => 'r1_RowCount / r2_RowCount',
+                    'nullWhenZero' => true,
+                    'tiers' => new List<Map<String, Object>>{
+                        new Map<String, Object>{ 'min' => 0.5, 'value' => 0.1 },
+                        new Map<String, Object>{ 'min' => 0, 'value' => 0.05 }
+                    }
+                }
+            }
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        Boolean hasTierCol = false;
+        for (MergedGridDTO.ColumnDefinition col : result.columns) {
+            if (col.key != null && col.key.startsWith('tier_')) {
+                hasTierCol = true;
+                break;
+            }
+        }
+        System.assert(hasTierCol);
+    }
+
+    @IsTest
+    static void testCalculatedFieldsWithInjectedData() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            buildParsedReport1D('00O000000000001AAA', 0, 'Report 1'),
+            buildParsedReport1D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{
+            'mergeMode' => 'OUTER_JOIN',
+            'calculatedFields' => new List<Map<String, Object>>{
+                new Map<String, Object>{
+                    'label' => 'Difference',
+                    'formula' => 'r1_RowCount - r2_RowCount'
+                }
+            }
+        });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size(), result.errors.isEmpty() ? '' : result.errors[0].message);
+        Boolean hasCalcCol = false;
+        for (MergedGridDTO.ColumnDefinition col : result.columns) {
+            if (col.key != null && col.key.startsWith('calc_')) {
+                hasCalcCol = true;
+                break;
+            }
+        }
+        System.assert(hasCalcCol);
+    }
+
+    @IsTest
+    static void testKeyOverlapWarning() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedGridDTO.ParsedReportData r1 = buildParsedReport1D('00O000000000001AAA', 0, 'Report 1');
+        MergedGridDTO.ParsedReportData r2 = buildParsedReport1D('00O000000000002AAA', 1, 'Report 2');
+        r1.primaryKeys.add('C');
+        r1.valuesByKeyByAggregate.put('C', new Map<String, Decimal>{ 'RowCount' => 15 });
+        r1.labelsByKey.put('C', 'Owner C');
+        r2.primaryKeys.add('D');
+        r2.primaryKeys.add('E');
+        r2.primaryKeys.add('F');
+        r2.valuesByKeyByAggregate.put('D', new Map<String, Decimal>{ 'RowCount' => 1 });
+        r2.valuesByKeyByAggregate.put('E', new Map<String, Decimal>{ 'RowCount' => 1 });
+        r2.valuesByKeyByAggregate.put('F', new Map<String, Decimal>{ 'RowCount' => 1 });
+        r2.labelsByKey.put('D', 'Owner D');
+        r2.labelsByKey.put('E', 'Owner E');
+        r2.labelsByKey.put('F', 'Owner F');
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{ r1, r2 };
+        String optionsJson = JSON.serialize(new Map<String, Object>{ 'mergeMode' => 'OUTER_JOIN' });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assertEquals(0, result.errors.size());
+        System.assert(result.keyOverlapPercentage < 70);
+        Boolean hasOverlapWarning = false;
+        for (String w : result.warnings) {
+            if (w != null && w.contains('Key overlap')) {
+                hasOverlapWarning = true;
+                break;
+            }
+        }
+        System.assert(hasOverlapWarning);
+    }
+
+    @IsTest
+    static void testMainCatchBlock() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        MergedGridDTO.ParsedReportData r1 = buildParsedReport1D('00O000000000001AAA', 0, 'Report 1');
+        r1.valuesByKeyByAggregate.put('A', null);
+        MergedReportController.testParsedReportsOverride = new List<MergedGridDTO.ParsedReportData>{
+            r1,
+            buildParsedReport1D('00O000000000002AAA', 1, 'Report 2')
+        };
+        String optionsJson = JSON.serialize(new Map<String, Object>{ 'mergeMode' => 'UNION' });
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        MergedReportController.testParsedReportsOverride = null;
+
+        System.assertNotEquals(null, result);
+        System.assert(result.errors.size() > 0);
+        System.assert(result.errors[0].message.contains('error') || result.errors[0].message.contains('Error'));
+    }
+
+    @IsTest
+    static void testParseOptionsNonMapRoot() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        String optionsJson = '"not an object"';
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        System.assertNotEquals(null, result);
+    }
+
+    @IsTest
+    static void testParseOptionsMalformedMaxRows() {
+        List<Id> reportIds = new List<Id>{ '00O000000000001AAA', '00O000000000002AAA' };
+        String optionsJson = '{"maxRows": "not a number"}';
+        Test.startTest();
+        MergedGridDTO result = MergedReportController.getMergedReportData(reportIds, optionsJson);
+        Test.stopTest();
+        System.assertNotEquals(null, result);
+    }
+
     // ========================================================================
     // INTEGRATION TESTS WITH REAL REPORTS (SeeAllData=true)
     // ========================================================================
@@ -1872,9 +2230,8 @@ private class MergedReportControllerTest {
             System.assertEquals(0, result.errors.size(), 'Should have no errors with matching dimensions');
             System.assert(result.columns.size() > 0, 'Should have columns');
             System.assertEquals(false, result.hasSecondDimension, 'Should not have second dimension for 1D reports');
-            if (result.keyOverlapPercentage != null) {
-                System.assert(result.keyOverlapPercentage >= 70, 'Key overlap should be high');
-            }
+            // Key overlap depends on org data; only verify it was calculated (no strict threshold)
+            System.assertNotEquals(null, result.keyOverlapPercentage, 'Key overlap should be populated');
         }
     }
     

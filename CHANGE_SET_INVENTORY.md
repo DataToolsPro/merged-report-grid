@@ -1,7 +1,7 @@
 # Change Set Deployment Inventory
 
 **Component:** Merged Report Grid Lightning Web Component  
-**Version:** 1.5.3  
+**Version:** 1.5.5  
 **Date:** February 2026
 
 ---
@@ -332,4 +332,4 @@ sf project deploy start -o sandbox --test-level RunSpecifiedTests --tests Merged
 ---
 
 **Last Updated:** February 2026  
-**Component Version:** 1.5.3
+**Component Version:** 1.5.5
